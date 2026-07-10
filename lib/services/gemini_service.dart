@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+
 class GeminiService {
   static const String apiKey = "AQ.Ab8RN6IDPUSVAcK_vpXzkGuxKni2j5H7hEqt8Z9VXeWPj7xA4w";
 
   static Future<String> askAI(String question) async {
     final url = Uri.parse(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey",
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey",
     );
 
     final response = await http.post(
