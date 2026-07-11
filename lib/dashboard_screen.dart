@@ -5,9 +5,12 @@ import 'map_screen.dart';
 import 'timetable_screen.dart';
 import 'attendance_screen.dart';
 import 'library_screen.dart';
+import 'notice_screen.dart';
+import 'events_screen.dart';
+import 'digital_id_screen.dart'; // 👈 naya import
 
 class DashboardScreen extends StatefulWidget {
-  final UserRole userRole; // 👈 naya - login se aayega
+  final UserRole userRole;
 
   const DashboardScreen({super.key, required this.userRole});
 
@@ -18,6 +21,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
+  // 👇 Index order: 0-AI, 1-Map, 2-Timetable, 3-Attendance, 4-Library, 5-Canteen, 6-Notices, 7-Events, 8-Digital ID
   final List<Map<String, dynamic>> items = const [
     {"title": "AI Assistant", "icon": Icons.smart_toy_outlined},
     {"title": "Campus Map", "icon": Icons.map_outlined},
@@ -25,6 +29,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     {"title": "Attendance", "icon": Icons.fact_check_outlined},
     {"title": "Library", "icon": Icons.menu_book_outlined},
     {"title": "Canteen", "icon": Icons.restaurant_outlined},
+    {"title": "Notices", "icon": Icons.campaign_outlined},
+    {"title": "Events", "icon": Icons.celebration_outlined},
+    {"title": "Digital ID", "icon": Icons.badge_outlined},
   ];
 
   String get _greeting {
@@ -34,7 +41,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return "Good Evening";
   }
 
-  // 👇 Role ke hisaab se naam/subtitle dikhane ke liye
   String get _displayName => widget.userRole == UserRole.student ? "Prasad" : "Dr. Rajesh Sharma";
   String get _displaySubtitle =>
       widget.userRole == UserRole.student ? "Computer Engineering" : "Chemistry Department";
@@ -54,12 +60,51 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openProfile() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ProfileScreen(role: widget.userRole)), // 👈 role pass kiya
+      MaterialPageRoute(builder: (_) => ProfileScreen(role: widget.userRole)),
     );
   }
 
   void _openAttendance() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => AttendanceScreen()));
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AttendanceScreen(
+          userRole: widget.userRole,
+          currentUserName: _displayName,
+        ),
+      ),
+    );
+  }
+
+  void _openLibrary() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const LibraryScreen()));
+  }
+
+  void _openNotice() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => NoticeScreen(userRole: widget.userRole)),
+    );
+  }
+
+  void _openEvents() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EventsScreen(
+          userRole: widget.userRole,
+          currentUserName: _displayName,
+        ),
+      ),
+    );
+  }
+
+  // 👇 Naya function - Digital ID kholne ke liye
+  void _openDigitalId() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => DigitalIdScreen(userRole: widget.userRole)),
+    );
   }
 
   void _onNavTap(int index) {
@@ -95,15 +140,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _openAttendance();
         break;
       case 4:
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const LibraryScreen(),
-    ),
-  );
-  break;
+        _openLibrary();
+        break;
       case 5:
         _showComingSoon("Canteen");
+        break;
+      case 6:
+        _openNotice();
+        break;
+      case 7:
+        _openEvents();
+        break;
+      case 8:
+        _openDigitalId(); // 👈 naya case
+        break;
+      default:
         break;
     }
   }
@@ -179,6 +230,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _drawerTile(Icons.fact_check_outlined, "Attendance", () {
               Navigator.pop(context);
               _openAttendance();
+            }),
+            _drawerTile(Icons.menu_book_outlined, "Library", () {
+              Navigator.pop(context);
+              _openLibrary();
+            }),
+            _drawerTile(Icons.campaign_outlined, "Notices", () {
+              Navigator.pop(context);
+              _openNotice();
+            }),
+            _drawerTile(Icons.celebration_outlined, "Events", () {
+              Navigator.pop(context);
+              _openEvents();
+            }),
+            // 👇 Drawer mein bhi add kiya
+            _drawerTile(Icons.badge_outlined, "Digital ID", () {
+              Navigator.pop(context);
+              _openDigitalId();
             }),
             const Divider(height: 24),
             _drawerTile(Icons.settings_outlined, "Settings", () => Navigator.pop(context)),

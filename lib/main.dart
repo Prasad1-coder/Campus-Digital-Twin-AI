@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dashboard_screen.dart';
-import 'profile_screen.dart'; // 👈 UserRole enum yahan se aata hai
+import 'profile_screen.dart'; 
 
 void main() {
   runApp(const CampusApp());
@@ -58,9 +58,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _continueWithGoogle() {
     _navigateToDashboard();
+  
   }
 
-  // 👇 Yahi tha fix - userRole pass karna zaroori tha, const bhi hataya
   void _navigateToDashboard() {
     Navigator.pushReplacement(
       context,
