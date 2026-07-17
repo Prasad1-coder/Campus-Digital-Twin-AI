@@ -16,6 +16,8 @@ dependencies:
   speech_to_text: ^7.0.0
   google_sign_in: ^6.2.2
   share_plus: ^10.1.2
+  image_picker: ^1.1.2
+  gal: ^2.3.0 # for save image in gallery
 
 dev_dependencies:
   flutter_test:

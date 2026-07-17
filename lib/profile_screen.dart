@@ -119,7 +119,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
 
-          // 👇 Stats row - quick glance info
+          //Stats row - quick glance info
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
