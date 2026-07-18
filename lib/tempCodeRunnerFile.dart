@@ -9,7 +9,6 @@ import 'notice_screen.dart';
 import 'events_screen.dart';
 import 'digital_id_screen.dart';
 import 'analytics_dashboard.dart';
-import 'settings_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final UserRole userRole;
@@ -115,7 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
+  // 👇 FIX: const hataya - AnalyticsDashboardScreen ko const constructor nahi milna chahiye
   void _openAnalytics() {
     if (widget.userRole != UserRole.teacher) return;
     Navigator.push(
