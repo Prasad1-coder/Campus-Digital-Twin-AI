@@ -9,15 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  google_fonts: ^6.2.1
-  google_maps_flutter: ^2.9.0
+  google_fonts: ^8.2.1
+  google_maps_flutter: ^2.18.0
   qr_flutter: ^4.1.0
-  mobile_scanner: ^6.0.2
-  speech_to_text: ^7.0.0
+  mobile_scanner: ^7.4.0
+  speech_to_text: ^7.4.0
   google_sign_in: ^6.2.2
-  share_plus: ^10.1.2
-  image_picker: ^1.1.2
-  gal: ^2.3.0 # for save image in gallery
+  share_plus: ^13.3.0
+  image_picker: ^1.2.3
+  gal: ^2.3.3 # for save image in gallery
+  google_generative_ai: ^0.4.7
 
 dev_dependencies:
   flutter_test:

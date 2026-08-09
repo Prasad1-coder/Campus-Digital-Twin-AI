@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart'; // for share
 import 'profile_screen.dart'; // we connect to profile
+import 'user_role.dart';
 
 enum NoticeCategory { exam, placement, holiday, circular, event }
 

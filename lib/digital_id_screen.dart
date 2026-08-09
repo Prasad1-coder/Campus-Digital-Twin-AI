@@ -9,58 +9,56 @@ import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'profile_screen.dart';
+import 'services/auth_service.dart';
+import 'user_model.dart';
+import 'user_role.dart';
+import 'permission_model.dart';
 
 class DigitalIdScreen extends StatefulWidget {
-  final UserRole userRole;
-
-  const DigitalIdScreen({super.key, this.userRole = UserRole.student});
+  const DigitalIdScreen({super.key});
 
   @override
   State<DigitalIdScreen> createState() => _DigitalIdScreenState();
 }
 
+// FIX: "SingleAnimationControllerStateMixin" does not exist in Flutter.
+// The correct mixin for a single AnimationController + vsync is:
 class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProviderStateMixin {
-  File? profileImage;
-  int themeIndex = 0;
-  bool isDownloading = false;
-  bool isFlipped = false; // 👈 naya - card flip ke liye
-
+  final AuthService _authService = AuthService();
   final GlobalKey _cardKey = GlobalKey();
 
   late AnimationController _flipController;
   late Animation<double> _flipAnimation;
 
-  final List<List<Color>> themes = [
-    [Colors.blue, const Color(0xFF1565C0)],
-    [Colors.purple, const Color(0xFF6A1B9A)],
-    [Colors.teal, const Color(0xFF00695C)],
-    [const Color(0xFF37474F), const Color(0xFF102027)],
-    [Colors.orange, const Color(0xFFE65100)],
-  ];
+  File? _profileImage;
+  bool _isFlipped = false;
+  bool _isLost = false;
+  bool _isDownloading = false;
 
-  final List<String> themeNames = ["Ocean Blue", "Royal Purple", "Emerald Teal", "Midnight Dark", "Sunset Orange"];
+  // ---------- Theme ----------
+  static const Color _primary = Color(0xFF1565C0);
+  static const Color _primaryDark = Color(0xFF0D47A1);
+  static const Color _accent = Color(0xFF42A5F5);
+  static const Color _lightBg = Color(0xFFF4F7FC);
+  static const Color _softBlue = Color(0xFFE3F2FD);
+  static const Color _textDark = Color(0xFF1A237E);
 
-  Map<String, String> get _studentData => {
-        "name": "Prasad",
-        "id": "ST2026001",
-        "roll": "123",
-        "dept": "Computer Engineering",
-        "validTill": "30 June 2027",
-      };
-
-  Map<String, String> get _teacherData => {
-        "name": "Dr. Rajesh Sharma",
-        "id": "FAC2019045",
-        "dept": "Chemistry Department",
-        "validTill": "31 March 2028",
-      };
+  UserModel? get _user => _authService.getCurrentUser();
+  bool get _isStudent => _user?.role == UserRole.student;
+  bool get _canVerify =>
+      _authService.hasPermission('attendance', 'canManage') ||
+      _authService.hasPermission('attendance', 'canApprove');
 
   @override
   void initState() {
     super.initState();
-    _flipController = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
-    _flipAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _flipController, curve: Curves.easeInOut));
+    _flipController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _flipAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _flipController, curve: Curves.easeInOut),
+    );
   }
 
   @override
@@ -71,12 +69,12 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
 
   void _toggleFlip() {
     HapticFeedback.lightImpact();
-    if (isFlipped) {
+    if (_isFlipped) {
       _flipController.reverse();
     } else {
       _flipController.forward();
     }
-    setState(() => isFlipped = !isFlipped);
+    setState(() => _isFlipped = !_isFlipped);
   }
 
   Future<void> _pickImage() async {
@@ -84,63 +82,36 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
     if (picked != null) {
-      setState(() => profileImage = File(picked.path));
+      setState(() => _profileImage = File(picked.path));
     }
   }
 
-  void _changeTheme() {
-    HapticFeedback.mediumImpact();
-    setState(() => themeIndex = (themeIndex + 1) % themes.length);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("🎨 Theme: ${themeNames[themeIndex]}"),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(14),
-        backgroundColor: themes[themeIndex][0],
-      ),
-    );
-  }
-
-  // 👇 FIX: "gal" nahi, "Gal" (capital G) - ye class hai, static methods isi se call hote hain
   Future<void> _downloadId() async {
-    // Agar card abhi flipped hai to pehle front pe le aao (front side hi download honi chahiye)
-    if (isFlipped) {
+    if (_isFlipped) {
       _flipController.reverse();
-      setState(() => isFlipped = false);
-      await Future.delayed(const Duration(milliseconds: 550));
+      setState(() => _isFlipped = false);
+      await Future.delayed(const Duration(milliseconds: 650));
     }
 
-    setState(() => isDownloading = true);
+    setState(() => _isDownloading = true);
     HapticFeedback.mediumImpact();
 
     try {
-      // Permission check - kuch devices pe explicit check better hota hai
-      final hasAccess = await Gal.hasAccess();
-      if (!hasAccess) {
-        final granted = await Gal.requestAccess();
-        if (!granted) {
-          throw Exception("Gallery permission denied");
-        }
-      }
-
       final boundary = _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       final Uint8List pngBytes = byteData!.buffer.asUint8List();
 
-      await Gal.putImageBytes(pngBytes, name: "digital_id_${DateTime.now().millisecondsSinceEpoch}");
+      await Gal.putImageBytes(pngBytes, name: "digital_id_${_user?.id ?? 'guest'}");
 
       if (mounted) {
-        HapticFeedback.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.white, size: 18),
                 SizedBox(width: 10),
-                Text("ID Card gallery mein save ho gaya!"),
+                Text("ID Card saved to gallery!"),
               ],
             ),
             backgroundColor: Colors.green.shade600,
@@ -154,7 +125,7 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("❌ Download fail hua: $e"),
+            content: Text("❌ Download failed: $e"),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -163,12 +134,40 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
         );
       }
     } finally {
-      if (mounted) setState(() => isDownloading = false);
+      if (mounted) setState(() => _isDownloading = false);
     }
   }
 
-  void _viewQr(String qrPayload, Color color) {
+  void _shareId() {
     HapticFeedback.selectionClick();
+    Share.share(
+      "Check out my Campus Digital ID: ${_user?.fullName ?? 'Guest'} (${_user?.collegeId ?? 'N/A'}). Verified via Campus Digital Twin AI.",
+    );
+  }
+
+  void _toggleLostMode() {
+    HapticFeedback.heavyImpact();
+    setState(() => _isLost = !_isLost);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isLost ? "🚨 Card Marked as Lost. Access Deactivated." : "✅ Card Reactivated."),
+        backgroundColor: _isLost ? Colors.red.shade700 : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(14),
+      ),
+    );
+  }
+
+  void _showQrDialog() {
+    HapticFeedback.selectionClick();
+    final String qrData = jsonEncode({
+      "id": _user?.id,
+      "name": _user?.fullName,
+      "role": _user?.role.name,
+      "dept": _user?.department,
+    });
+
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -179,30 +178,50 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-                child: Icon(Icons.qr_code_scanner_rounded, color: color, size: 24),
-              ),
-              const SizedBox(height: 12),
-              Text("Scan for Verification", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
-              const SizedBox(height: 18),
-              Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
-                child: QrImageView(data: qrPayload, size: 220, version: QrVersions.auto),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [_primary.withOpacity(0.12), _accent.withOpacity(0.12)]),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.qr_code_scanner_rounded, color: _primary, size: 26),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
+              Text("Scan for Verification",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark)),
+              const SizedBox(height: 4),
+              Text("Show this code to campus staff", style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade200),
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(color: _primary.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: QrImageView(
+                  data: qrData,
+                  size: 220,
+                  version: QrVersions.auto,
+                  eyeStyle: QrEyeStyle(eyeShape: QrEyeShape.square, color: _primaryDark),
+                  dataModuleStyle: QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: _primary),
+                ),
+              ),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
+                height: 48,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
+                    backgroundColor: _primary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
-                  child: const Text("Close"),
+                  child: const Text("Close", style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
@@ -212,234 +231,173 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final isStudent = widget.userRole == UserRole.student;
-    final data = isStudent ? _studentData : _teacherData;
-    final cardColors = themes[themeIndex];
-    final primaryColor = cardColors[0];
-
-    final qrPayload = jsonEncode({
-      "id": data["id"],
-      "name": data["name"],
-      "role": isStudent ? "student" : "teacher",
-      "dept": data["dept"],
-    });
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        title: const Text("Digital ID", style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(18),
-        children: [
-          // 👇 Tap to flip - front/back dono sides
-          GestureDetector(
-            onTap: _toggleFlip,
-            child: AnimatedBuilder(
-              animation: _flipAnimation,
-              builder: (context, child) {
-                final angle = _flipAnimation.value * 3.14159;
-                final showFront = _flipAnimation.value < 0.5;
-
-                return Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angle),
-                  child: showFront
-                      ? _buildFrontCard(data, cardColors, primaryColor, qrPayload, isStudent)
-                      : Transform(
-                          alignment: Alignment.center,
-                          transform: Matrix4.identity()..rotateY(3.14159),
-                          child: _buildBackCard(cardColors, primaryColor),
-                        ),
-                );
-              },
+  void _verifyUser() {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Row(
+          children: [
+            Icon(Icons.verified_user_rounded, color: _primary, size: 22),
+            const SizedBox(width: 8),
+            const Text("Verify Identity", style: TextStyle(fontWeight: FontWeight.w800, color: _textDark)),
+          ],
+        ),
+        content: const Text(
+          "Use camera to scan student/faculty QR code for instant verification and attendance marking. (UI Ready)",
+          style: TextStyle(color: Colors.black54, height: 1.4),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel", style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text("Scanner opening... (UI Placeholder)"),
+                  backgroundColor: _primary,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              );
+            },
+            icon: const Icon(Icons.camera_alt, size: 18),
+            label: const Text("Open Scanner"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-          ),
-
-          const SizedBox(height: 8),
-          Center(
-            child: Text(
-              "💫 Tap card to flip",
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontStyle: FontStyle.italic),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Row(
-            children: [
-              Text("Actions", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.grey.shade700)),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: primaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                child: Text(themeNames[themeIndex], style: TextStyle(fontSize: 10.5, color: primaryColor, fontWeight: FontWeight.w600)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 2.4,
-            children: [
-              _ActionTile(
-                icon: isDownloading ? Icons.hourglass_top_rounded : Icons.download_outlined,
-                label: isDownloading ? "Saving..." : "Download ID",
-                color: Colors.blue,
-                onTap: isDownloading ? null : _downloadId,
-              ),
-              _ActionTile(
-                icon: Icons.share_outlined,
-                label: "Share ID",
-                color: Colors.green,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Share.share("${data["name"]} - ${isStudent ? "Student" : "Faculty"} ID: ${data["id"]}\n${data["dept"]}");
-                },
-              ),
-              _ActionTile(
-                icon: Icons.photo_camera_outlined,
-                label: "Change Photo",
-                color: Colors.orange,
-                onTap: _pickImage,
-              ),
-              _ActionTile(
-                icon: Icons.qr_code_2_rounded,
-                label: "View QR",
-                color: Colors.purple,
-                onTap: () => _viewQr(qrPayload, primaryColor),
-              ),
-              _ActionTile(
-                icon: Icons.palette_outlined,
-                label: "Change Theme",
-                color: Colors.teal,
-                onTap: _changeTheme,
-              ),
-              _ActionTile(
-                icon: Icons.flip_camera_android_outlined,
-                label: "Flip Card",
-                color: Colors.indigo,
-                onTap: _toggleFlip,
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  // 👇 Front side - poori details
-  Widget _buildFrontCard(Map<String, String> data, List<Color> cardColors, Color primaryColor, String qrPayload, bool isStudent) {
-    return RepaintBoundary(
-      key: _cardKey,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(22),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: cardColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 10))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.school_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text("DIGITAL ID", style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.check_circle, color: Colors.white, size: 12),
-                      SizedBox(width: 4),
-                      Text("Verified", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _lightBg,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 0,
+              pinned: true,
+              elevation: 0,
+              backgroundColor: _primary,
+              automaticallyImplyLeading: false,
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_primaryDark, _primary],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
                   ),
                 ),
-              ],
+              ),
+              title: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.badge_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Smart Digital ID',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                        Text('Campus Digital Twin AI', style: TextStyle(fontSize: 11, color: Colors.white70)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 20),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: _pickImage,
-                  child: Stack(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: CircleAvatar(
-                          radius: 40,
-                          backgroundColor: const Color(0xFFE3F2FD),
-                          backgroundImage: profileImage != null ? FileImage(profileImage!) : null,
-                          child: profileImage == null
-                              ? Icon(isStudent ? Icons.person : Icons.person_2_outlined, size: 42, color: primaryColor)
-                              : null,
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+                child: Column(
+                  children: [
+                    GestureDetector(
+                      onTap: _toggleFlip,
+                      child: AnimatedBuilder(
+                        animation: _flipAnimation,
+                        builder: (context, child) {
+                          final angle = _flipAnimation.value * 3.14159;
+                          final showFront = _flipAnimation.value < 0.5;
+                          return Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.identity()
+                              ..setEntry(3, 2, 0.001)
+                              ..rotateY(angle),
+                            child: showFront
+                                ? _buildFrontCard()
+                                : Transform(
+                                    alignment: Alignment.center,
+                                    transform: Matrix4.identity()..rotateY(3.14159),
+                                    child: _buildBackCard(),
+                                  ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8)],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.touch_app_rounded, size: 14, color: _primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              "Tap card to flip",
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                         ),
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(color: primaryColor, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
-                          child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 28),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Quick Actions",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _textDark)),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildActionsGrid(),
+                    const SizedBox(height: 26),
+                    _buildFutureReadyGrid(),
+                    const SizedBox(height: 12),
+                  ],
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(data["name"]!, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 3),
-                      Text(data["dept"]!, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
-                      const SizedBox(height: 10),
-                      if (isStudent) Text("Roll No: ${data["roll"]}", style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      Text("ID: ${data["id"]}", style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _viewQr(qrPayload, primaryColor),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                    child: QrImageView(data: qrPayload, size: 56, version: QrVersions.auto),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Container(height: 1, color: Colors.white.withOpacity(0.25)),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.event_available_outlined, color: Colors.white70, size: 15),
-                const SizedBox(width: 6),
-                Text("Valid Till: ${data["validTill"]}", style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
+              ),
             ),
           ],
         ),
@@ -447,102 +405,534 @@ class _DigitalIdScreenState extends State<DigitalIdScreen> with SingleTickerProv
     );
   }
 
-  // 👇 Back side - naya feature: emergency info + barcode-jaisa design
-  Widget _buildBackCard(List<Color> cardColors, Color primaryColor) {
+  // ---------------- FRONT CARD ----------------
+  Widget _buildFrontCard() {
+    final bool isSpecialRole = _user?.role == UserRole.hod || _user?.role == UserRole.principal;
+
+    return RepaintBoundary(
+      key: _cardKey,
+      child: Stack(
+        children: [
+          Container(
+            height: 300,
+            width: double.infinity,
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              // NOTE: removed the DecorationImage(AssetImage('assets/bg_id_card.png'))
+              // that was here before — that asset isn't declared in pubspec.yaml,
+              // so it would throw an "Unable to load asset" error at runtime.
+              // A gradient alone gives the same premium look without the crash risk.
+              gradient: const LinearGradient(
+                colors: [_primaryDark, _primary, _accent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 12)),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // subtle decorative circles for a premium card feel
+                Positioned(
+                  right: -30,
+                  top: -30,
+                  child: Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.06)),
+                  ),
+                ),
+                Positioned(
+                  left: -20,
+                  bottom: -40,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.05)),
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.school_rounded, color: Colors.white, size: 22),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text("CAMPUS DIGITAL TWIN AI",
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withOpacity(0.25)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.verified, color: Colors.greenAccent, size: 14),
+                              SizedBox(width: 4),
+                              Text("Verified",
+                                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: _pickImage,
+                          child: Stack(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.18), blurRadius: 8)],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 40,
+                                  backgroundColor: _softBlue,
+                                  backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                                  child: _profileImage == null
+                                      ? const Icon(Icons.person, size: 45, color: _primary)
+                                      : null,
+                                ),
+                              ),
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: _primary,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2),
+                                  ),
+                                  child: const Icon(Icons.camera_alt, size: 12, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _user?.fullName ?? "Guest User",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _user?.designation ?? "Student",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  _infoChip("ID: ${_user?.collegeId ?? 'N/A'}"),
+                                  if (_isStudent) _infoChip("Sem: ${_user?.semester ?? 6}"),
+                                  if (_isStudent) _infoChip("Div: ${_user?.division ?? 'A'}"),
+                                  if (!_isStudent) _infoChip("Dept: ${_user?.department ?? 'N/A'}"),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6)],
+                          ),
+                          child: GestureDetector(
+                            onTap: _showQrDialog,
+                            child: QrImageView(data: _user?.id ?? "guest", size: 55, version: QrVersions.auto),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.only(top: 12),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.15))),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.event_available_outlined, color: Colors.white70, size: 14),
+                              const SizedBox(width: 6),
+                              Text(
+                                _isStudent ? "Valid Till: 30 June 2027" : "Valid Till: 31 March 2028",
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              _accessChip(Icons.library_books),
+                              _accessChip(Icons.science),
+                              _accessChip(Icons.directions_bus),
+                              _accessChip(Icons.meeting_room),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Role ribbon — sits cleanly in the rounded corner, matches card radius now (26)
+          if (isSpecialRole)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _user?.role == UserRole.principal ? Colors.amber.shade700 : Colors.purple.shade600,
+                  borderRadius: const BorderRadius.only(
+                    topRight: Radius.circular(26),
+                    bottomLeft: Radius.circular(14),
+                  ),
+                ),
+                child: Text(
+                  _user?.role == UserRole.principal ? "SUPER ADMIN" : "DEPT HEAD",
+                  style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                ),
+              ),
+            ),
+          if (_isLost)
+            Container(
+              height: 300,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: Center(
+                child: Transform.rotate(
+                  angle: -0.3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.redAccent, width: 3),
+                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.red.withOpacity(0.08),
+                    ),
+                    child: const Text(
+                      "DEACTIVATED",
+                      style: TextStyle(color: Colors.redAccent, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoChip(String text) {
     return Container(
-      width: double.infinity,
-      height: 260,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: cardColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 10))],
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _accessChip(IconData icon) {
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 3)],
+      ),
+      child: Icon(icon, size: 10, color: _primary),
+    );
+  }
+
+  // ---------------- BACK CARD ----------------
+  Widget _buildBackCard() {
+    return Container(
+      height: 300,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_primaryDark, _primary, _accent],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 24, offset: const Offset(0, 12))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.info_outline, color: Colors.white, size: 18),
-              const SizedBox(width: 8),
-              const Text("CARD INFORMATION", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1)),
-            ],
-          ),
-          const SizedBox(height: 18),
           Container(
+            height: 34,
             width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(14)),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("📌 Ye card college property hai", style: TextStyle(color: Colors.white, fontSize: 12, height: 1.6)),
-                Text("📌 Kho jaye to turant office ko inform karein", style: TextStyle(color: Colors.white, fontSize: 12, height: 1.6)),
-                Text("📌 Card sirf identification ke liye valid hai", style: TextStyle(color: Colors.white, fontSize: 12, height: 1.6)),
-              ],
-            ),
+            margin: const EdgeInsets.only(top: 18),
+            color: Colors.black.withOpacity(0.85),
           ),
-          const Spacer(),
-          Center(
-            child: Column(
-              children: [
-                // simple barcode-look decoration
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: List.generate(30, (i) {
-                    return Container(
-                      width: 2,
-                      height: 30,
-                      margin: const EdgeInsets.symmetric(horizontal: 0.8),
-                      color: Colors.white.withOpacity(i % 3 == 0 ? 0.9 : 0.4),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 6),
-                const Text("XYZ ENGINEERING COLLEGE", style: TextStyle(color: Colors.white70, fontSize: 9, letterSpacing: 1)),
-              ],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: _infoBox("BLOOD GROUP", "B+")),
+                      const SizedBox(width: 10),
+                      Expanded(child: _infoBox("EMERGENCY", _user?.phoneNumber ?? "+91 98765 43210")),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(Icons.gavel_rounded, size: 11, color: Colors.white.withOpacity(0.6)),
+                      const SizedBox(width: 5),
+                      const Text("Terms & Conditions",
+                          style: TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    "• This card is non-transferable.\n• If found, please return to the college office.\n• Misuse of this card is a punishable offense.",
+                    style: TextStyle(color: Colors.white60, fontSize: 8.5, height: 1.4),
+                  ),
+                  const Spacer(),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(6),
+                              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 6)],
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(25, (i) {
+                                double width = (i % 3 == 0) ? 2.5 : (i % 2 == 0) ? 1.0 : 1.5;
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                                  width: width,
+                                  height: 25,
+                                  color: Colors.black87,
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "XYZ COLLEGE • ${_user?.collegeId ?? 'N/A'}",
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 8,
+                              letterSpacing: 2,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_user?.role == UserRole.principal)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Icon(Icons.draw_rounded, color: Colors.white.withOpacity(0.85), size: 30),
+                            const SizedBox(height: 2),
+                            const Text("Authorized Signature",
+                                style: TextStyle(color: Colors.white70, fontSize: 8, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _ActionTile({required this.icon, required this.label, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.shade200)),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-                child: Icon(icon, color: color, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.black87)),
-              ),
-            ],
-          ),
-        ),
+  Widget _infoBox(String title, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ---------------- ACTIONS GRID ----------------
+  Widget _buildActionsGrid() {
+    List<Map<String, dynamic>> actions = [
+      {"icon": Icons.qr_code_2_rounded, "label": "Show QR", "color": Colors.purple, "onTap": _showQrDialog},
+      {
+        "icon": _isDownloading ? Icons.hourglass_top_rounded : Icons.download_rounded,
+        "label": _isDownloading ? "Saving..." : "Download",
+        "color": Colors.blue,
+        "onTap": _isDownloading ? () {} : _downloadId,
+      },
+      {"icon": Icons.share_rounded, "label": "Share ID", "color": Colors.green, "onTap": _shareId},
+    ];
+
+    if (_canVerify) {
+      actions.add({"icon": Icons.verified_user_rounded, "label": "Verify User", "color": Colors.orange, "onTap": _verifyUser});
+    } else {
+      actions.add({
+        "icon": _isLost ? Icons.lock_open_rounded : Icons.report_problem_rounded,
+        "label": _isLost ? "Reactivate" : "Report Lost",
+        "color": _isLost ? Colors.green : Colors.red,
+        "onTap": _toggleLostMode,
+      });
+    }
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      crossAxisSpacing: 10,
+      mainAxisSpacing: 10,
+      childAspectRatio: 0.85,
+      children: actions.map((a) {
+        final Color color = a['color'] as Color;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: a['onTap'],
+            borderRadius: BorderRadius.circular(18),
+            splashColor: color.withOpacity(0.15),
+            highlightColor: color.withOpacity(0.08),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.grey.shade100),
+                boxShadow: [BoxShadow(color: color.withOpacity(0.12), blurRadius: 10, offset: const Offset(0, 4))],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+                    child: Icon(a['icon'] as IconData, color: color, size: 20),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(a['label'] as String,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black87)),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // ---------------- SMART ACCESS GRID ----------------
+  Widget _buildFutureReadyGrid() {
+    final features = [
+      {"icon": Icons.nfc_rounded, "label": "NFC Pay", "color": Colors.indigo},
+      {"icon": Icons.local_library_rounded, "label": "Library", "color": Colors.teal},
+      {"icon": Icons.meeting_room_rounded, "label": "Hostel", "color": Colors.deepOrange},
+      {"icon": Icons.event_available_rounded, "label": "Events", "color": Colors.pink},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Smart Access", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _textDark)),
+        const SizedBox(height: 12),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 4,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.95,
+          children: features.map((a) {
+            final Color color = a['color'] as Color;
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade100),
+                boxShadow: [BoxShadow(color: color.withOpacity(0.08), blurRadius: 8, offset: const Offset(0, 3))],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+                    child: Icon(a['icon'] as IconData, color: color, size: 18),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(a['label'] as String,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

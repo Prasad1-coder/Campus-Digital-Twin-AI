@@ -1,78 +1,50 @@
 import 'package:flutter/material.dart';
-import 'profile_screen.dart';
-import 'digital_id_screen.dart';
-import 'main.dart'; // LoginScreen yahan se aata hai
+import 'services/auth_service.dart';
+import 'user_model.dart';
+import 'user_role.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final UserRole userRole;
-
-  const SettingsScreen({super.key, required this.userRole});
+  const SettingsScreen({super.key});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool notificationsEnabled = true;
-  bool darkModeEnabled = false;
-  String selectedLanguage = "English";
+class _SettingsScreenState extends State<SettingsScreen> { 
+  final AuthService _authService = AuthService();
+  
+  // ---------- Theme Constants ----------
+  static const Color _primary = Color(0xFF1565C0);
+  static const Color _primaryDark = Color(0xFF0D47A1);
+  static const Color _lightBg = Color(0xFFF5F9FF);
+  static const Color _softBlue = Color(0xFFE3F2FD);
+  static const Color _textDark = Color(0xFF1A237E);
 
-  void _openProfile() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(role: widget.userRole)));
-  }
+  bool _darkMode = false;
+  bool _notificationsEnabled = true;
+  bool _biometricEnabled = false;
 
-  void _openDigitalId() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => DigitalIdScreen(userRole: widget.userRole)));
-  }
+  UserModel? get _user => _authService.getCurrentUser();
+  bool get _isStudent => _user?.role == UserRole.student;
+  bool get _isTeacher => _user?.role == UserRole.teacher;
+  bool get _isHOD => _user?.role == UserRole.hod;
+  bool get _isPrincipal => _user?.role == UserRole.principal;
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$feature - coming soon"),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(14),
-      ),
-    );
-  }
-
-  void _pickLanguage() {
-    showModalBottomSheet(
+  void _showFeatureDialog(String title) {
+    showDialog(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (context) {
-        final languages = ["English", "Hindi", "Marathi"];
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text("Select Language", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 6),
-                ...languages.map((lang) {
-                  final isSelected = lang == selectedLanguage;
-                  return ListTile(
-                    leading: Icon(
-                      isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                      color: isSelected ? Colors.blue : Colors.grey,
-                    ),
-                    title: Text(lang, style: const TextStyle(fontWeight: FontWeight.w500)),
-                    onTap: () {
-                      setState(() => selectedLanguage = lang);
-                      Navigator.pop(context);
-                    },
-                  );
-                }),
-              ],
-            ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: _textDark)),
+        content: Text("The $title module is ready for backend integration. (UI Placeholder)"),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+            child: const Text("Close"),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -80,22 +52,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Logout?"),
-        content: const Text("Kya aap sach mein logout karna chahte ho?"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text("Logout?", style: TextStyle(fontWeight: FontWeight.w800, color: _textDark)),
+        content: const Text("Are you sure you want to log out from the Campus Digital Twin AI app?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                (route) => false,
-              );
+          ElevatedButton(
+            onPressed: () async {
+              await _authService.logout();
+              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
             },
-            child: const Text("Logout", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text("Logout"),
           ),
         ],
       ),
@@ -105,297 +76,284 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: _lightBg,
       appBar: AppBar(
-        title: const Text("Settings", style: TextStyle(fontWeight: FontWeight.w600)),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
         elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 30),
-        children: [
-          // ============ ACCOUNT ============
-          _SettingsSection(
-            title: "Account",
-            icon: Icons.person_outline_rounded,
-            children: [
-              _SettingsTile(
-                icon: Icons.account_circle_outlined,
-                label: "Profile",
-                onTap: _openProfile,
-              ),
-              _SettingsTile(
-                icon: Icons.edit_outlined,
-                label: "Edit Profile",
-                onTap: () => _showComingSoon("Edit Profile"),
-              ),
-              _SettingsTile(
-                icon: Icons.badge_outlined,
-                label: "Digital ID",
-                onTap: _openDigitalId,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ============ PREFERENCES ============
-          _SettingsSection(
-            title: "Preferences",
-            icon: Icons.tune_rounded,
-            children: [
-              _SettingsSwitchTile(
-                icon: Icons.notifications_outlined,
-                label: "Notifications",
-                value: notificationsEnabled,
-                onChanged: (v) => setState(() => notificationsEnabled = v),
-              ),
-              _SettingsSwitchTile(
-                icon: Icons.dark_mode_outlined,
-                label: "Dark Mode",
-                value: darkModeEnabled,
-                onChanged: (v) {
-                  setState(() => darkModeEnabled = v);
-                  _showComingSoon("Dark Mode");
-                },
-              ),
-              _SettingsTile(
-                icon: Icons.language_outlined,
-                label: "Language",
-                trailingText: selectedLanguage,
-                onTap: _pickLanguage,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ============ CAMPUS ============
-          _SettingsSection(
-            title: "Campus",
-            icon: Icons.school_outlined,
-            children: [
-              _SettingsTile(
-                icon: Icons.fact_check_outlined,
-                label: "Attendance Settings",
-                onTap: () => _showComingSoon("Attendance Settings"),
-              ),
-              _SettingsTile(
-                icon: Icons.menu_book_outlined,
-                label: "Library Settings",
-                onTap: () => _showComingSoon("Library Settings"),
-              ),
-              _SettingsTile(
-                icon: Icons.smart_toy_outlined,
-                label: "AI Assistant Settings",
-                onTap: () => _showComingSoon("AI Assistant Settings"),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ============ PRIVACY & SECURITY ============
-          _SettingsSection(
-            title: "Privacy & Security",
-            icon: Icons.lock_outline_rounded,
-            children: [
-              _SettingsTile(
-                icon: Icons.privacy_tip_outlined,
-                label: "Privacy Policy",
-                onTap: () => _showComingSoon("Privacy Policy"),
-              ),
-              _SettingsTile(
-                icon: Icons.admin_panel_settings_outlined,
-                label: "Permissions",
-                onTap: () => _showComingSoon("Permissions"),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ============ ABOUT ============
-          _SettingsSection(
-            title: "About",
-            icon: Icons.info_outline_rounded,
-            children: [
-              _SettingsTile(
-                icon: Icons.apps_outlined,
-                label: "About App",
-                onTap: () => _showComingSoon("About App"),
-              ),
-              _SettingsTile(
-                icon: Icons.numbers_outlined,
-                label: "Version",
-                trailingText: "1.0.0",
-                onTap: null,
-              ),
-              _SettingsTile(
-                icon: Icons.feedback_outlined,
-                label: "Feedback",
-                onTap: () => _showComingSoon("Feedback"),
-              ),
-              _SettingsTile(
-                icon: Icons.support_agent_outlined,
-                label: "Contact Support",
-                onTap: () => _showComingSoon("Contact Support"),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 26),
-
-          // ============ LOGOUT ============
-          Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _showLogoutDialog,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.shade100),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.logout_rounded, color: Colors.red.shade600, size: 19),
-                    const SizedBox(width: 10),
-                    Text(
-                      "Logout",
-                      style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.bold, fontSize: 14.5),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          Center(
-            child: Text(
-              "Campus Digital Twin AI v1.0.0",
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ================================================================
-// REUSABLE WIDGETS
-// ================================================================
-
-class _SettingsSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final List<Widget> children;
-
-  const _SettingsSection({required this.title, required this.icon, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 10),
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: Colors.blue),
-              const SizedBox(width: 8),
-              Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-            ],
+        toolbarHeight: 70,
+        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(colors: [_primaryDark, _primary], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3))],
-          ),
-          child: Column(children: children),
-        ),
-      ],
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? trailingText;
-  final VoidCallback? onTap;
-
-  const _SettingsTile({required this.icon, required this.label, this.trailingText, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        child: Row(
+        title: const Text("Settings", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 19)),
+      ),
+      body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.blue.withOpacity(0.08), shape: BoxShape.circle),
-              child: Icon(icon, size: 17, color: Colors.blue),
+            _buildProfileHeader(),
+            const SizedBox(height: 24),
+            
+            // Account Section
+            _buildSectionTitle("Account"),
+            const SizedBox(height: 12),
+            _buildSettingsCard(
+              children: [
+                _buildTile(Icons.person_outline_rounded, "Profile Information", "Update your personal details", () => _showFeatureDialog("Profile")),
+                _buildTile(Icons.lock_outline_rounded, "Change Password", "Update your security password", () => _showFeatureDialog("Change Password")),
+                _buildTile(Icons.security_rounded, "Two-Factor Authentication (2FA)", "Add an extra layer of security", () => _showFeatureDialog("2FA")),
+                _buildSwitchTile(Icons.fingerprint_rounded, "Biometric Login", "Use fingerprint/face unlock", _biometricEnabled, (val) => setState(() => _biometricEnabled = val)),
+              ],
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+            const SizedBox(height: 24),
+
+            // Preferences Section
+            _buildSectionTitle("Preferences"),
+            const SizedBox(height: 12),
+            _buildSettingsCard(
+              children: [
+                _buildSwitchTile(Icons.notifications_active_outlined, "Push Notifications", "Receive alerts for notices & events", _notificationsEnabled, (val) => setState(() => _notificationsEnabled = val)),
+                _buildSwitchTile(Icons.dark_mode_outlined, "Dark Mode", "Toggle app theme", _darkMode, (val) => setState(() => _darkMode = val)),
+                _buildTile(Icons.language_rounded, "Language", "English (Default)", () => _showFeatureDialog("Language Selection")),
+                _buildTile(Icons.accessibility_new_rounded, "Accessibility", "Font size and contrast settings", () => _showFeatureDialog("Accessibility")),
+              ],
             ),
-            if (trailingText != null)
-              Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: Text(trailingText!, style: TextStyle(fontSize: 12.5, color: Colors.grey.shade500)),
+            const SizedBox(height: 24),
+
+            // Role-Based Preferences
+            if (_isStudent) ...[
+              _buildSectionTitle("Student Preferences"),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                children: [
+                  _buildTile(Icons.privacy_tip_outlined, "Privacy Settings", "Control who can see your data", () => _showFeatureDialog("Privacy Settings")),
+                  _buildTile(Icons.download_for_offline_outlined, "Download My Data", "Request a copy of your data", () => _showFeatureDialog("Data Download")),
+                ],
               ),
-            if (onTap != null)
-              Icon(Icons.arrow_forward_ios_rounded, size: 13, color: Colors.grey.shade400),
+              const SizedBox(height: 24),
+            ],
+
+            if (_isTeacher) ...[
+              _buildSectionTitle("Teacher Preferences"),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                children: [
+                  _buildTile(Icons.fact_check_outlined, "Attendance Preferences", "Default marking settings", () => _showFeatureDialog("Attendance Preferences")),
+                  _buildTile(Icons.calendar_month_outlined, "Timetable Preferences", "Sync and view settings", () => _showFeatureDialog("Timetable Preferences")),
+                  _buildTile(Icons.class_outlined, "Class Management", "Default class configurations", () => _showFeatureDialog("Class Preferences")),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            if (_isHOD || _isPrincipal) ...[
+              _buildSectionTitle(_isPrincipal ? "Administration" : "Department Management"),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                children: [
+                  if (_isHOD) ...[
+                    _buildTile(Icons.business_outlined, "Department Preferences", "Configure department settings", () => _showFeatureDialog("Dept Preferences")),
+                    _buildTile(Icons.approval_outlined, "Approval Workflow", "Configure notice/event approvals", () => _showFeatureDialog("Approval Preferences")),
+                  ],
+                  if (_isPrincipal) ...[
+                    _buildTile(Icons.admin_panel_settings_outlined, "College Settings", "General college configuration", () => _showFeatureDialog("College Settings")),
+                    _buildTile(Icons.people_alt_outlined, "User Management", "Manage students & staff", () => _showFeatureDialog("User Management")),
+                    _buildTile(Icons.manage_accounts_outlined, "Role Management", "Define roles & permissions", () => _showFeatureDialog("Role Management")),
+                    _buildTile(Icons.apartment_outlined, "Department Management", "Add/Edit departments", () => _showFeatureDialog("Department Management")),
+                  ]
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // System Configuration (Principal Only)
+            if (_isPrincipal) ...[
+              _buildSectionTitle("System & Security"),
+              const SizedBox(height: 12),
+              _buildSettingsCard(
+                children: [
+                  _buildTile(Icons.settings_applications_outlined, "System Configuration", "API & integration settings", () => _showFeatureDialog("System Configuration")),
+                  _buildTile(Icons.cloud_upload_outlined, "Backup & Restore", "Manage cloud backups", () => _showFeatureDialog("Backup & Restore")),
+                  _buildTile(Icons.history_rounded, "Audit Logs", "View system activity logs", () => _showFeatureDialog("Audit Logs")),
+                  _buildTile(Icons.devices_other_outlined, "Device Management", "Manage active sessions", () => _showFeatureDialog("Device Management")),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Support & About
+            _buildSectionTitle("Support & About"),
+            const SizedBox(height: 12),
+            _buildSettingsCard(
+              children: [
+                _buildTile(Icons.help_outline_rounded, "Help & Support", "FAQs and contact us", () => _showFeatureDialog("Help & Support")),
+                _buildTile(Icons.feedback_outlined, "Send Feedback", "Report a bug or suggest a feature", () => _showFeatureDialog("Feedback")),
+                _buildTile(Icons.info_outline_rounded, "About Application", "Version 1.0.0 (Build 2024.12.01)", () => _showFeatureDialog("About App")),
+              ],
+            ),
+            const SizedBox(height: 32),
+
+            // Logout Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _showLogoutDialog,
+                icon: const Icon(Icons.logout_outlined, color: Colors.white),
+                label: const Text("Logout", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade700,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
-}
 
-class _SettingsSwitchTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  // ============================================================
+  //  WIDGETS
+  // ============================================================
 
-  const _SettingsSwitchTile({required this.icon, required this.label, required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+  Widget _buildProfileHeader() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [_primary, _primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [BoxShadow(color: _primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
+      ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.blue.withOpacity(0.08), shape: BoxShape.circle),
-            child: Icon(icon, size: 17, color: Colors.blue),
+            padding: const EdgeInsets.all(3),
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            child: CircleAvatar(
+              radius: 30,
+              backgroundColor: _softBlue,
+              child: Icon(Icons.person, size: 35, color: _primary),
+            ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
           Expanded(
-            child: Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Colors.black87)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_user?.fullName ?? "Guest User", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 4),
+                Text("${_user?.role.name.toUpperCase()} • ${_user?.department ?? 'N/A'}", style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500)),
+              ],
+            ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: Colors.blue,
-          ),
+          IconButton(icon: const Icon(Icons.edit_outlined, color: Colors.white), onPressed: () => _showFeatureDialog("Profile"))
         ],
       ),
     );
   }
+
+  Widget _buildSectionTitle(String title) {
+  return Padding(
+    padding: const EdgeInsets.only(left: 8),
+    child: Text(
+      title,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF616161),
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+  Widget _buildSettingsCard({required List<Widget> children}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: List.generate(children.length, (index) {
+          return Column(
+            children: [
+              children[index],
+              if (index < children.length - 1) Divider(height: 1, indent: 16, endIndent: 16, color: Colors.grey.shade100),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: _softBlue, borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: _primary, size: 20),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    );
+  }
+
+Widget _buildSwitchTile(
+  IconData icon,
+  String title,
+  String subtitle,
+  bool value,
+  Function(bool) onChanged,
+) {
+  return ListTile(
+    leading: Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: _softBlue,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(
+        icon,
+        color: _primary,
+        size: 20,
+      ),
+    ),
+    title: Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+        color: _textDark,
+      ),
+    ),
+    subtitle: Text(
+      subtitle,
+      style: TextStyle(
+        fontSize: 11,
+        color: Colors.grey.shade500,
+      ),
+    ),
+    trailing: Switch(
+      value: value,
+      onChanged: onChanged,
+      activeColor: _primary,
+    ),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 16,
+      vertical: 8,
+    ),
+  );
+}
 }

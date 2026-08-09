@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../user_role.dart'; // 👈 FIX: Added missing import for UserRole
 import '../attendance_screen.dart';
 import '../library_screen.dart';
 import '../timetable_screen.dart';
@@ -91,8 +91,9 @@ class AICommandService {
 
       case "timetable":
         Navigator.push(
+          // 👈 FIX: Added userRole parameter to TimetableScreen
           context,
-          MaterialPageRoute(builder: (_) => const TimetableScreen()),
+          MaterialPageRoute(builder: (_) => TimetableScreen(userRole: userRole)),
         );
         return;
 
@@ -124,8 +125,9 @@ class AICommandService {
 
       case "digital_id":
         Navigator.push(
+          // 👈 FIX: Removed userRole parameter because DigitalIdScreen now fetches it from AuthService
           context,
-          MaterialPageRoute(builder: (_) => DigitalIdScreen(userRole: userRole)),
+          MaterialPageRoute(builder: (_) => const DigitalIdScreen()),
         );
         return;
 
