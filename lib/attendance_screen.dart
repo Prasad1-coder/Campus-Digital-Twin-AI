@@ -21,7 +21,6 @@ class AttendanceScreen extends StatefulWidget {
 class _AttendanceScreenState extends State<AttendanceScreen> {
   final AuthService _authService = AuthService();
   
-  // ---------- Theme Constants ----------
   static const Color _primary = Color(0xFF1565C0);
   static const Color _primaryDark = Color(0xFF0D47A1);
   static const Color _accent = Color(0xFF42A5F5);
@@ -40,7 +39,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   bool get isTeacher => widget.userRole == UserRole.teacher;
   bool get isAdmin => !isStudent && !isTeacher;
 
-  // Dummy Data
   final List<Map<String, dynamic>> _subjects = [
     {"name": "Data Structures", "code": "CS201", "att": 85, "total": 40, "present": 34, "faculty": "Dr. Sharma", "color": Colors.blue},
     {"name": "Operating Systems", "code": "CS202", "att": 72, "total": 40, "present": 29, "faculty": "Dr. Rao", "color": Colors.purple},
@@ -98,9 +96,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  // ============================================================
-  //  STUDENT VIEW
-  // ============================================================
   Widget _buildStudentView() {
     int totalAtt = 82;
     return Column(
@@ -250,9 +245,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  // ============================================================
-  //  TEACHER VIEW
-  // ============================================================
   Widget _buildTeacherView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,7 +257,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.8,
+          childAspectRatio: 1.4, // Fixed aspect ratio
           children: [
             _statCard("Classes Today", "3", Icons.class_outlined),
             _statCard("Students Marked", "133", Icons.people_alt_outlined),
@@ -446,14 +438,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  // ============================================================
-  //  HOD & PRINCIPAL VIEW (ADMIN)
-  // ============================================================
   Widget _buildAdminView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Overall Analytics Card
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -492,7 +480,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         const SizedBox(height: 24),
         _sectionTitle("Department Analytics"),
         const SizedBox(height: 12),
-        // Custom Bar Chart UI
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -515,7 +502,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.8,
+          childAspectRatio: 1.4, // Fixed aspect ratio
           children: [
             _statCard("Teachers", "45", Icons.school_outlined),
             _statCard("Students", "1.2k", Icons.groups_outlined),
@@ -573,9 +560,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
   }
 
-  // ============================================================
-  //  REUSABLE WIDGETS
-  // ============================================================
   Widget _sectionTitle(String title) {
     return Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _textDark));
   }
@@ -593,8 +577,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Icon(icon, color: _primary, size: 22),
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _textDark)),
-          Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark)),
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

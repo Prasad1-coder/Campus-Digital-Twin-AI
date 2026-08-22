@@ -13,10 +13,16 @@ import 'analytics_dashboard.dart' hide DigitalIdScreen;
 import 'settings_screen.dart';
 import 'canteen_screen.dart';
 import 'placement_dashboard_screen.dart';
+import 'examination_screen.dart';
+import 'global_search_screen.dart';
+import 'notification_screen.dart';
 import 'services/auth_service.dart';
+import 'services/gemini_service.dart';
 import 'user_model.dart';
 import 'user_role.dart';
 import 'permission_model.dart';
+import 'fees_screen.dart';
+import 'hostel_screen.dart'; 
 
 class DashboardScreen extends StatefulWidget {
   final UserRole userRole;
@@ -31,6 +37,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final AuthService _authService = AuthService();
 
+  String _aiSuggestion = "Fetching a personalized tip for you...";
+  bool _isLoadingAi = true;
+
   static const Color _primary = Color(0xFF1565C0);
   static const Color _primaryDark = Color(0xFF0D47A1);
   static const Color _accent = Color(0xFF42A5F5);
@@ -40,6 +49,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   UserModel? get _currentUser => _authService.getCurrentUser();
   PermissionModel? get _permissions => _authService.getCurrentPermissions();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAiSuggestion();
+  }
+
+  Future<void> _fetchAiSuggestion() async {
+    try {
+      String role = widget.userRole.name;
+      String prompt = "Give one short (max 15 words), highly encouraging and actionable tip for a $role to improve their campus life and studies. Do not include any conversational filler, just the tip.";
+      String reply = await GeminiService.askAI(prompt);
+      
+      if (mounted) {
+        setState(() {
+          _aiSuggestion = reply.isNotEmpty ? reply : "Stay focused and make the most of your campus resources today!";
+          _isLoadingAi = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _aiSuggestion = widget.userRole == UserRole.student 
+              ? "Your attendance is below 75%. Attend the next class to avoid debarment." 
+              : "You have 2 pending leave approvals. Review them in the Attendance section.";
+          _isLoadingAi = false;
+        });
+      }
+    }
+  }
 
   String get _greeting {
     final hour = DateTime.now().hour;
@@ -65,6 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return _authService.hasPermission(module, action);
   }
 
+  // ---------- Navigation Helpers ----------
   void _openAI() => Navigator.push(context, MaterialPageRoute(builder: (_) => const AIScreen()));
   void _openMap() => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen()));
   void _openTimetable() => Navigator.push(context, MaterialPageRoute(builder: (_) => TimetableScreen(userRole: widget.userRole)));
@@ -77,7 +117,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openEvents() => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsScreen(userRole: widget.userRole, currentUserName: _userName)));
   void _openDigitalId() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalIdScreen()));
   void _openPlacement() => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlacementDashboardScreen()));
+  void _openExams() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExaminationScreen()));
   void _openAnalytics() => Navigator.push(context, MaterialPageRoute(builder: (_) => AnalyticsDashboardScreen()));
+  void _openFees() => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeesScreen()));
+  void _openHostel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HostelScreen())); // 👈 FIX: Added function here
+  
+  void _openSearch() => Navigator.push(context, MaterialPageRoute(builder: (_) => GlobalSearchScreen()));
+  void _openNotifications() => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationScreen()));
 
   void _showLogoutDialog() {
     showDialog(
@@ -150,6 +196,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_hasAccess('reports', 'canView')) {
       list.add({"title": "Reports", "icon": Icons.summarize_outlined, "action": _openAnalytics});
     }
+    if (_hasAccess('attendance', 'canView')) {
+      list.add({"title": "Exams", "icon": Icons.assignment_turned_in_outlined, "action": _openExams});
+    }
+    if (_hasAccess('attendance', 'canView')) { 
+      list.add({"title": "Fees", "icon": Icons.account_balance_wallet_outlined, "action": _openFees});
+    }
+    if (_hasAccess('attendance', 'canView')) { 
+      list.add({"title": "Hostel", "icon": Icons.apartment_outlined, "action": _openHostel}); // 👈 FIX: Added Hostel to list
+    }
     
     list.add({"title": "Profile", "icon": Icons.person_outline, "action": _openProfile});
     list.add({"title": "Settings", "icon": Icons.settings_outlined, "action": _openSettings});
@@ -220,48 +275,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
-        title: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.menu, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-            Expanded(
-              child: Text(
-                safeIndex == 0 ? "$_greeting, $_userName 👋" : _navItems[safeIndex].label!,
-                style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: flutter.FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () {}),
-            IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.white), onPressed: () {}),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
+        title: Text(
+          safeIndex == 0 ? "$_greeting, $_userName 👋" : _navItems[safeIndex].label!,
+          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: flutter.FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: false,
+        actions: [
+          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _openSearch),
+          IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.white), onPressed: _openNotifications),
+        ],
       ),
       drawer: _buildSmartDrawer(),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: _primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        icon: const Icon(Icons.smart_toy_outlined),
-        label: Text("AI Chat", style: TextStyle(fontWeight: flutter.FontWeight.bold)),
-        onPressed: _openAI,
-      ),
-      bottomNavigationBar: _buildFloatingBottomNav(),
-      body: SafeArea(
-        child: IndexedStack(
-          index: safeIndex,
-          children: _screens,
-        ),
+      bottomNavigationBar: _buildCleanBottomNav(),
+      body: IndexedStack(
+        index: safeIndex,
+        children: _screens,
       ),
     );
   }
 
-  Widget _buildFloatingBottomNav() {
+  Widget _buildCleanBottomNav() {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -279,9 +322,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           backgroundColor: Colors.white,
           selectedItemColor: _primary,
           unselectedItemColor: Colors.grey.shade400,
-          selectedLabelStyle: TextStyle(fontWeight: flutter.FontWeight.bold, fontSize: 11),
+          selectedLabelStyle: TextStyle(fontWeight: flutter.FontWeight.bold, fontSize: 12),
           unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: flutter.FontWeight.normal),
-          showUnselectedLabels: false,
+          showUnselectedLabels: true,
           elevation: 0,
           onTap: _onNavTap,
           items: _navItems,
@@ -291,20 +334,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHomeContent() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeaderCard(),
-          const SizedBox(height: 24),
-          _buildQuickStats(),
-          const SizedBox(height: 24),
-          _buildModuleGrid(),
-          const SizedBox(height: 24),
-          _buildHomeDashboardSections(),
-        ],
+    return SafeArea(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeaderCard(),
+            const SizedBox(height: 24),
+            _buildQuickStats(),
+            const SizedBox(height: 24),
+            _buildModuleGrid(),
+            const SizedBox(height: 24),
+            _buildHomeDashboardSections(),
+          ],
+        ),
       ),
     );
   }
@@ -355,7 +400,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               const Icon(Icons.apartment_outlined, color: Colors.white70, size: 16),
               const SizedBox(width: 6),
-              Expanded(child: Text(_college, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500))),
+              Expanded(child: Text(_college, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
           ),
           const SizedBox(height: 6),
@@ -363,7 +408,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
               const SizedBox(width: 6),
-              Expanded(child: Text(_department, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500))),
+              Expanded(child: Text(_department, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
           ),
         ],
@@ -388,7 +433,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return SizedBox(
-      height: 90,
+      height: 110,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
@@ -408,15 +453,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(color: (s['color'] as Color).withOpacity(0.1), shape: BoxShape.circle),
                   child: Icon(s['icon'] as IconData, color: s['color'] as Color, size: 16),
                 ),
+                const SizedBox(height: 8),
                 Text(s['value'] as String, style: TextStyle(fontSize: 18, fontWeight: flutter.FontWeight.bold, color: _textDark)),
-                Text(s['title'] as String, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: flutter.FontWeight.w500)),
+                Flexible(
+                  child: Text(
+                    s['title'] as String,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: flutter.FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
           );
@@ -439,7 +492,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             crossAxisCount: 3,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            childAspectRatio: 0.95,
+            childAspectRatio: 1.0,
           ),
           itemBuilder: (context, index) {
             final module = _modules[index];
@@ -499,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(index == 0 ? "Tech Fest 2024" : "Annual Sports Day", style: TextStyle(fontWeight: flutter.FontWeight.bold, color: _textDark)),
+                            Text(index == 0 ? "Tech Fest 2024" : "Annual Sports Day", style: TextStyle(fontWeight: flutter.FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 4),
                             Text(index == 0 ? "15 Dec, Auditorium" : "20 Dec, Ground", style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           ],
@@ -516,25 +569,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         _buildSectionHeader("AI Suggestions", Icons.smart_toy_outlined, _openAI),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF1A237E), Color(0xFF3949AB)]),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.tips_and_updates, color: Colors.amber, size: 24),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  widget.userRole == UserRole.student 
-                    ? "Your attendance is below 75%. Attend the next class to avoid debarment."
-                    : "You have 2 pending leave approvals. Review them in the Attendance section.",
-                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: flutter.FontWeight.normal),
-                ),
-              )
-            ],
+        GestureDetector(
+          onTap: _openAI,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF1A237E), Color(0xFF3949AB)]),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome, color: Colors.amber, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _isLoadingAi
+                      ? const LinearProgressIndicator(color: Colors.white, backgroundColor: Colors.white24)
+                      : Text(
+                          _aiSuggestion,
+                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: flutter.FontWeight.normal),
+                        ),
+                )
+              ],
+            ),
           ),
         )
       ],
@@ -617,7 +673,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildDrawerHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [_primaryDark, _primary, _accent],
@@ -625,68 +681,71 @@ class _DashboardScreenState extends State<DashboardScreen> {
           end: Alignment.bottomRight,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Stack(
-                children: [
-                  const CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 35, color: _primary),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Stack(
                   children: [
-                    Text(
-                      _userName,
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: flutter.FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    const CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.person, size: 35, color: _primary),
                     ),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        _roleString,
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: flutter.FontWeight.bold),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
                       ),
                     )
                   ],
                 ),
-              )
-            ],
-          ),
-          const SizedBox(height: 16),
-          _headerRow(Icons.apartment, _college),
-          const SizedBox(height: 6),
-          _headerRow(Icons.school_outlined, _department),
-          const SizedBox(height: 6),
-          _headerRow(Icons.email_outlined, _email),
-        ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _userName,
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: flutter.FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          _roleString,
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: flutter.FontWeight.bold),
+                        ),
+                      )
+                    ],
+                  ),
+                )
+              ],
+            ),
+            const SizedBox(height: 16),
+            _headerRow(Icons.apartment, _college),
+            const SizedBox(height: 6),
+            _headerRow(Icons.school_outlined, _department),
+            const SizedBox(height: 6),
+            _headerRow(Icons.email_outlined, _email),
+          ],
+        ),
       ),
     );
   }
@@ -794,11 +853,18 @@ class _DashboardCard extends StatelessWidget {
                 decoration: const BoxDecoration(color: Color(0xFFE3F2FD), shape: BoxShape.circle),
                 child: Icon(icon, size: 26, color: const Color(0xFF1565C0)),
               ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, fontWeight: flutter.FontWeight.bold, color: Colors.black87),
+              const SizedBox(height: 8),
+              Flexible(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, fontWeight: flutter.FontWeight.bold, color: Colors.black87),
+                  ),
+                ),
               ),
             ],
           ),

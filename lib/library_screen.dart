@@ -202,7 +202,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
         children: [
           Icon(s["icon"] as IconData, color: _primary, size: 22),
           Text(s["value"] as String, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _textDark)),
-          Text(s["title"] as String, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+          Flexible(
+            child: Text(
+              s["title"] as String,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -248,7 +255,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       child: Icon(a["icon"] as IconData, color: a["color"] as Color, size: 20),
                     ),
                     const SizedBox(height: 8),
-                    Text(a["title"] as String, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black87)),
+                    Flexible(
+                      child: Text(
+                        a["title"] as String,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black87),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -363,7 +378,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 200,
+          height: 210, // Height increased slightly to fit text nicely
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -392,6 +407,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             children: [
               Container(
                 height: 160,
+                width: 130,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(colors: [b["color"] as Color, (b["color"] as Color).withOpacity(0.7)]),
                   borderRadius: BorderRadius.circular(12),

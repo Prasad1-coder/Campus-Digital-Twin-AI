@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:ffi';
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart' as flutter;
-import 'package:flutter/services.dart'; // 👈 FIX: Added missing import for Clipboard
+import 'package:flutter/services.dart';
 import 'services/gemini_service.dart';
 import 'services/ai_command_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -37,13 +35,13 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
   static const Color _primary = Color(0xFF1565C0);
   static const Color _primaryDark = Color(0xFF0D47A1);
   static const Color _lightBg = Color(0xFFF5F9FF);
+  static const Color _softBlue = Color(0xFFE3F2FD);
   static const Color _textDark = Color(0xFF1A237E);
 
   late final AnimationController _fadeController;
 
   String get _userName => _currentUser?.fullName.split(' ').first ?? "Guest";
   
-  // FIX: Null safety error fixed here
   String get _roleString {
     final role = _currentUser?.role.name;
     if (role == null || role.isEmpty) return "Guest";
@@ -131,8 +129,8 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
       onResult: (result) {
         setState(() {
           _controller.text = result.recognizedWords;
-          _controller.selection = TextSelection.collapsed(
-            offset: _controller.text.length,
+          _controller.selection = TextSelection.fromPosition(
+            TextPosition(offset: _controller.text.length),
           );
         });
       },
@@ -260,8 +258,8 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: Text("Clear Chat?", style: TextStyle(fontWeight: flutter.FontWeight.bold, color: _textDark)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text("Clear Chat?", style: TextStyle(fontWeight: FontWeight.bold, color: _textDark)),
         content: const Text("Are you sure you want to clear this conversation?"),
         actions: [
           TextButton(
@@ -347,8 +345,8 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("Campus AI Assistant", style: TextStyle(fontSize: 16, fontWeight: flutter.FontWeight.w700, color: Colors.white)),
-                  Text("Online • $_userName ($_roleString)", style: TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: flutter.FontWeight.w500)),
+                  const Text("Campus AI Assistant", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                  Text("Online • $_userName ($_roleString)", style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -417,39 +415,48 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
-          if (_isListening)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                    const SizedBox(width: 8),
-                    Text("Listening...", style: TextStyle(color: Colors.red.shade600, fontStyle: FontStyle.italic, fontSize: 12.5, fontWeight: flutter.FontWeight.w600)),
-                  ],
-                ),
-              ),
-            ),
-          if (_isTyping)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
-              child: Align(
-                alignment: Alignment.center,
-                child: OutlinedButton.icon(
-                  onPressed: _stopTyping,
-                  icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                  label: const Text("Stop generating"),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          // 👇 FIX: Wrapped bottom section in SafeArea to prevent keyboard/system bar from overlapping
+          SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_isListening)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                          const SizedBox(width: 8),
+                          Text("Listening...", style: TextStyle(color: Colors.red.shade600, fontStyle: FontStyle.italic, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                if (_isTyping)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: OutlinedButton.icon(
+                        onPressed: _stopTyping,
+                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+                        label: const Text("Stop generating"),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                      ),
+                    ),
+                  ),
+                _buildInputArea(),
+              ],
             ),
-          _buildInputArea(),
+          ),
         ],
       ),
     );
@@ -519,7 +526,7 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
                     children: [
                       Text(
                         message["time"]!,
-                        style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: flutter.FontWeight.w500),
+                        style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
                       ),
                       if (!me) ...[
                         const SizedBox(width: 8),
@@ -592,7 +599,7 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
 
   Widget _buildInputArea() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 18),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8), // Reduced bottom padding, SafeArea handles the rest
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
@@ -615,7 +622,7 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
             Expanded(
               child: TextField(
                 controller: _controller,
-                style: TextStyle(fontSize: 14.5, color: Colors.black87),
+                style: const TextStyle(fontSize: 14.5, color: Colors.black87),
                 decoration: InputDecoration(
                   hintText: _isListening ? "Listening..." : "Message Campus AI...",
                   hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
@@ -647,9 +654,6 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
       ),
     );
   }
-}
-
-mixin FontWeight {
 }
 
 // ============================================================
@@ -704,9 +708,9 @@ class _CommandChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(icon, style: TextStyle(fontSize: 14)),
+              Text(icon, style: const TextStyle(fontSize: 14)),
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 12.5, fontWeight: flutter.FontWeight.w700, color: Color(0xFF1565C0))),
+              Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
             ],
           ),
         ),
@@ -751,7 +755,7 @@ class _EmptyStateSuggestionCard extends StatelessWidget {
               const Expanded(
                 child: Text(
                   "How can I help you today?",
-                  style: TextStyle(fontSize: 18, fontWeight: flutter.FontWeight.w800, color: Color(0xFF1A237E)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
                 ),
               ),
             ],
@@ -798,9 +802,9 @@ class _QuickActionButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(icon, style: TextStyle(fontSize: 16)),
+              Text(icon, style: const TextStyle(fontSize: 16)),
               const SizedBox(width: 8),
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: flutter.FontWeight.w700, color: Colors.black87)),
+              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
             ],
           ),
         ),

@@ -19,6 +19,7 @@ dependencies:
   image_picker: ^1.2.3
   gal: ^2.3.3 # for save image in gallery
   google_generative_ai: ^0.4.7
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:
