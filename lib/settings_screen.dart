@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'user_model.dart';
 import 'user_role.dart';
+import 'theme_controller.dart'; // 👈 FIX: Imported Theme Controller
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,14 +14,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> { 
   final AuthService _authService = AuthService();
   
-  // ---------- Theme Constants ----------
-  static const Color _primary = Color(0xFF1565C0);
-  static const Color _primaryDark = Color(0xFF0D47A1);
-  static const Color _lightBg = Color(0xFFF5F9FF);
-  static const Color _softBlue = Color(0xFFE3F2FD);
-  static const Color _textDark = Color(0xFF1A237E);
-
-  bool _darkMode = false;
   bool _notificationsEnabled = true;
   bool _biometricEnabled = false;
 
@@ -35,12 +28,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800, color: _textDark)),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
         content: Text("The $title module is ready for backend integration. (UI Placeholder)"),
         actions: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, foregroundColor: Colors.white),
             child: const Text("Close"),
           ),
         ],
@@ -53,7 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text("Logout?", style: TextStyle(fontWeight: FontWeight.w800, color: _textDark)),
+        title: const Text("Logout?", style: TextStyle(fontWeight: FontWeight.w800)),
         content: const Text("Are you sure you want to log out from the Campus Digital Twin AI app?"),
         actions: [
           TextButton(
@@ -75,16 +68,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: _lightBg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         toolbarHeight: 70,
         backgroundColor: Colors.transparent,
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [_primaryDark, _primary], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
         title: const Text("Settings", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 19)),
@@ -117,7 +113,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSettingsCard(
               children: [
                 _buildSwitchTile(Icons.notifications_active_outlined, "Push Notifications", "Receive alerts for notices & events", _notificationsEnabled, (val) => setState(() => _notificationsEnabled = val)),
-                _buildSwitchTile(Icons.dark_mode_outlined, "Dark Mode", "Toggle app theme", _darkMode, (val) => setState(() => _darkMode = val)),
+                // 👇 FIX: Dark Mode Toggle Connected to ThemeController
+                _buildSwitchTile(
+                  Icons.dark_mode_outlined, 
+                  "Dark Mode", 
+                  "Toggle app theme", 
+                  ThemeController.instance.isDark, 
+                  (val) {
+                    ThemeController.instance.toggleTheme(val);
+                    setState(() {}); // To instantly reflect on UI
+                  }
+                ),
                 _buildTile(Icons.language_rounded, "Language", "English (Default)", () => _showFeatureDialog("Language Selection")),
                 _buildTile(Icons.accessibility_new_rounded, "Accessibility", "Font size and contrast settings", () => _showFeatureDialog("Accessibility")),
               ],
@@ -224,12 +230,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ============================================================
 
   Widget _buildProfileHeader() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [_primary, _primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        gradient: LinearGradient(colors: [colorScheme.primary, colorScheme.primary.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: _primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(color: colorScheme.primary.withOpacity(0.3), blurRadius: 16, offset: const Offset(0, 8))],
       ),
       child: Row(
         children: [
@@ -238,8 +246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
             child: CircleAvatar(
               radius: 30,
-              backgroundColor: _softBlue,
-              child: Icon(Icons.person, size: 35, color: _primary),
+              backgroundColor: colorScheme.primary.withOpacity(0.1),
+              child: Icon(Icons.person, size: 35, color: colorScheme.primary),
             ),
           ),
           const SizedBox(width: 16),
@@ -260,24 +268,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-  return Padding(
-    padding: const EdgeInsets.only(left: 8),
-    child: Text(
-      title,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF616161),
-        letterSpacing: 0.5,
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+          color: theme.colorScheme.onSurface.withOpacity(0.6),
+          letterSpacing: 0.5,
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildSettingsCard({required List<Widget> children}) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color ?? theme.cardColor, // 👈 FIX: Adapts to Dark Mode card color
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
       ),
@@ -286,7 +296,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Column(
             children: [
               children[index],
-              if (index < children.length - 1) Divider(height: 1, indent: 16, endIndent: 16, color: Colors.grey.shade100),
+              if (index < children.length - 1) Divider(height: 1, indent: 16, endIndent: 16, color: theme.dividerColor),
             ],
           );
         }),
@@ -295,65 +305,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return ListTile(
       leading: Container(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: _softBlue, borderRadius: BorderRadius.circular(10)),
-        child: Icon(icon, color: _primary, size: 20),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.1), 
+          borderRadius: BorderRadius.circular(10)
+        ),
+        child: Icon(icon, color: colorScheme.primary, size: 20),
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: _textDark)),
-      subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: colorScheme.onSurface)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 11, color: theme.hintColor)),
+      trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: theme.hintColor),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     );
   }
 
-Widget _buildSwitchTile(
-  IconData icon,
-  String title,
-  String subtitle,
-  bool value,
-  Function(bool) onChanged,
-) {
-  return ListTile(
-    leading: Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: _softBlue,
-        borderRadius: BorderRadius.circular(10),
+  Widget _buildSwitchTile(
+    IconData icon,
+    String title,
+    String subtitle,
+    bool value,
+    Function(bool) onChanged,
+  ) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          color: colorScheme.primary,
+          size: 20,
+        ),
       ),
-      child: Icon(
-        icon,
-        color: _primary,
-        size: 20,
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          color: colorScheme.onSurface,
+        ),
       ),
-    ),
-    title: Text(
-      title,
-      style: const TextStyle(
-        fontWeight: FontWeight.w700,
-        fontSize: 14,
-        color: _textDark,
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(
+          fontSize: 11,
+          color: theme.hintColor,
+        ),
       ),
-    ),
-    subtitle: Text(
-      subtitle,
-      style: TextStyle(
-        fontSize: 11,
-        color: Colors.grey.shade500,
+      trailing: Switch(
+        value: value,
+        onChanged: onChanged,
+        activeColor: colorScheme.primary,
       ),
-    ),
-    trailing: Switch(
-      value: value,
-      onChanged: onChanged,
-      activeColor: _primary,
-    ),
-    contentPadding: const EdgeInsets.symmetric(
-      horizontal: 16,
-      vertical: 8,
-    ),
-  );
-}
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 8,
+      ),
+    );
+  }
 }

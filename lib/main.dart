@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'login_screen.dart';
 import 'dashboard_screen.dart';
 import 'services/auth_service.dart';
+import 'theme_controller.dart';
 
-// ============================================================
-//  Campus Digital Twin AI - Main Entry Point
-//  Architecture: Clean Architecture & Scalable RBAC Ready
-// ============================================================
-
-void main() {
-  // Ensure Flutter bindings are initialized before making any native calls
-  // (e.g., SecureStorage, SharedPreferences, Firebase).
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // NOTE: Dependency Injection (e.g., GetIt, Provider) can be initialized here
-  // before runApp() is called in the future.
+  // 👇 FIX: Wrapped in try-catch to catch exact Firebase error
+  try {
+    await Firebase.initializeApp();
+    print("✅ Firebase Initialized Successfully!");
+  } catch (e) {
+    print("❌ Firebase Initialization Error: $e");
+  }
   
+  await ThemeController.instance.init();
   runApp(const CampusApp());
 }
 
@@ -25,30 +26,26 @@ class CampusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Campus Digital Twin AI',
-      
-      // ----------------- THEME ARCHITECTURE -----------------
-      theme: _buildLightTheme(),
-      darkTheme: _buildDarkTheme(), // Ready for future implementation
-      themeMode: ThemeMode.light,   // Default to Light Mode
-
-      // ----------------- LOCALIZATION ARCHITECTURE -----------------
-      // Ready for future multilingual support (English, Hindi, Marathi)
-      supportedLocales: const [
-        Locale('en'), // Default
-        Locale('hi'), // Hindi (Future)
-        Locale('mr'), // Marathi (Future)
-      ],
-      // Note: Add flutter_localizations package in pubspec.yaml later to use delegates
-      
-      // ----------------- NAVIGATION & ROUTES -----------------
-      home: const SplashScreen(), // Initial Screen
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.instance.theme,
+      builder: (context, mode, _) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Campus Digital Twin AI',
+          theme: _buildLightTheme(),
+          darkTheme: _buildDarkTheme(),
+          themeMode: mode,
+          supportedLocales: const [
+            Locale('en'),
+            Locale('hi'),
+            Locale('mr'),
+          ],
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 
-  // ----------------- LIGHT THEME CONFIGURATION -----------------
   ThemeData _buildLightTheme() {
     const Color primaryColor = Color(0xFF1565C0);
     const Color scaffoldBgColor = Color(0xFFF5F9FF);
@@ -76,6 +73,7 @@ class CampusApp extends StatelessWidget {
       cardTheme: CardThemeData(
         elevation: 2,
         shadowColor: primaryColor.withOpacity(0.1),
+        color: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -88,22 +86,47 @@ class CampusApp extends StatelessWidget {
     );
   }
 
-  // ----------------- DARK THEME ARCHITECTURE (For Future) -----------------
   ThemeData _buildDarkTheme() {
+    const Color primaryColor = Color(0xFF42A5F5);
+    const Color scaffoldBgColor = Color(0xFF121212);
+
+    final ColorScheme darkScheme = ColorScheme.fromSeed(
+      seedColor: primaryColor,
+      primary: primaryColor,
+      brightness: Brightness.dark,
+    );
+
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF1565C0),
-        brightness: Brightness.dark,
+      colorScheme: darkScheme,
+      scaffoldBackgroundColor: scaffoldBgColor,
+      textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).apply(
+        bodyColor: Colors.white,
+        displayColor: Colors.white,
       ),
-      // Add dark specific configurations here later
+      appBarTheme: AppBarTheme(
+        backgroundColor: scaffoldBgColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 2,
+        shadowColor: Colors.black.withOpacity(0.5),
+        color: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
     );
   }
 }
 
-// ============================================================
-//  SPLASH SCREEN (Initial Loader & Auth State Check)
-// ============================================================
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -124,19 +147,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     )..forward().then((_) => _checkAuthStatus());
   }
 
-  /// Checks if the user is already authenticated and routes accordingly.
-  /// 
-  /// In a production environment with SecureStorage or Firebase, this method
-  /// would asynchronously attempt to restore the session (e.g., read JWT token).
-  void _checkAuthStatus() {
+  void _checkAuthStatus() async {
     if (!mounted) return;
-    
-    // Simulate async session restoration for future readiness
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      
+
+    try {
+      // 1. Try to Restore Login Session
+      await _authService.tryRestoreSession();
+
+      // 2. Route based on login status
       if (_authService.isLoggedIn && _authService.getCurrentRole() != null) {
-        // User is logged in, navigate to Dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -146,13 +165,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           ),
         );
       } else {
-        // User is not logged in, navigate to Login
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const LoginScreen()),
         );
       }
-    });
+    } catch (e) {
+      print("❌ Auth Restore Error: $e");
+      // Agar session restore mein error aaye toh direct login page bhej do
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   @override

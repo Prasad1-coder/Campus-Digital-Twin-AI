@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart' as flutter;
 import 'ai_screen.dart';
 import 'profile_screen.dart';
 import 'map_screen.dart';
@@ -22,7 +21,16 @@ import 'user_model.dart';
 import 'user_role.dart';
 import 'permission_model.dart';
 import 'fees_screen.dart';
-import 'hostel_screen.dart'; 
+import 'hostel_screen.dart';
+import 'drawer_widget.dart'; 
+import 'admin_panel_screen.dart'; 
+
+// 👇 FIX: Global Colors so _DashboardCard can access them
+const Color _primary = Color(0xFF1565C0);
+const Color _primaryDark = Color(0xFF0D47A1);
+const Color _accent = Color(0xFF42A5F5);
+const Color _softBlue = Color(0xFFE3F2FD);
+const Color _textDark = Color(0xFF1A237E);
 
 class DashboardScreen extends StatefulWidget {
   final UserRole userRole;
@@ -39,13 +47,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _aiSuggestion = "Fetching a personalized tip for you...";
   bool _isLoadingAi = true;
-
-  static const Color _primary = Color(0xFF1565C0);
-  static const Color _primaryDark = Color(0xFF0D47A1);
-  static const Color _accent = Color(0xFF42A5F5);
-  static const Color _lightBg = Color(0xFFF5F9FF);
-  static const Color _softBlue = Color(0xFFE3F2FD);
-  static const Color _textDark = Color(0xFF1A237E);
 
   UserModel? get _currentUser => _authService.getCurrentUser();
   PermissionModel? get _permissions => _authService.getCurrentPermissions();
@@ -115,44 +116,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openSettings() => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
   void _openNotice() => Navigator.push(context, MaterialPageRoute(builder: (_) => NoticeScreen(userRole: widget.userRole)));
   void _openEvents() => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsScreen(userRole: widget.userRole, currentUserName: _userName)));
-  void _openDigitalId() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalIdScreen()));
+  void _openDigitalId() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalIdScreen())); // 👈 const works now
   void _openPlacement() => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlacementDashboardScreen()));
   void _openExams() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExaminationScreen()));
   void _openAnalytics() => Navigator.push(context, MaterialPageRoute(builder: (_) => AnalyticsDashboardScreen()));
   void _openFees() => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeesScreen()));
-  void _openHostel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HostelScreen())); // 👈 FIX: Added function here
+  void _openHostel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HostelScreen())); 
+  void _openAdminPanel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen())); 
   
   void _openSearch() => Navigator.push(context, MaterialPageRoute(builder: (_) => GlobalSearchScreen()));
   void _openNotifications() => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationScreen()));
-
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text("Logout?", style: TextStyle(fontWeight: flutter.FontWeight.bold, color: _textDark)),
-        content: const Text("Are you sure you want to log out from the Campus Digital Twin AI app?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              await _authService.logout();
-              Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text("Logout"),
-          ),
-        ],
-      ),
-    );
-  }
 
   List<Map<String, dynamic>> get _modules {
     final List<Map<String, dynamic>> list = [];
@@ -203,7 +176,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       list.add({"title": "Fees", "icon": Icons.account_balance_wallet_outlined, "action": _openFees});
     }
     if (_hasAccess('attendance', 'canView')) { 
-      list.add({"title": "Hostel", "icon": Icons.apartment_outlined, "action": _openHostel}); // 👈 FIX: Added Hostel to list
+      list.add({"title": "Hostel", "icon": Icons.apartment_outlined, "action": _openHostel}); 
+    }
+    
+    if (_currentUser?.role == UserRole.hod || _currentUser?.role == UserRole.principal) {
+      list.add({"title": "Admin Panel", "icon": Icons.admin_panel_settings_outlined, "action": _openAdminPanel});
     }
     
     list.add({"title": "Profile", "icon": Icons.person_outline, "action": _openProfile});
@@ -255,10 +232,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     int safeIndex = _selectedIndex < _navItems.length ? _selectedIndex : 0;
 
     return Scaffold(
-      backgroundColor: _lightBg,
+      backgroundColor: theme.scaffoldBackgroundColor, // 👈 Dark Mode Support
       extendBody: true,
       appBar: AppBar(
         toolbarHeight: 70,
@@ -275,13 +253,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: Colors.white),
-          onPressed: () => Scaffold.of(context).openDrawer(),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.white),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
         ),
         title: Text(
           safeIndex == 0 ? "$_greeting, $_userName 👋" : _navItems[safeIndex].label!,
-          style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: flutter.FontWeight.bold),
+          style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -291,7 +271,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.white), onPressed: _openNotifications),
         ],
       ),
-      drawer: _buildSmartDrawer(),
+      drawer: AppDrawer(
+        userRole: widget.userRole,
+        currentNavigatorIndex: _selectedIndex,
+        onItemTapped: (index) {
+          _onNavTap(index);
+        },
+      ),
       bottomNavigationBar: _buildCleanBottomNav(),
       body: IndexedStack(
         index: safeIndex,
@@ -301,10 +287,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildCleanBottomNav() {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor, // 👈 Dark Mode Support
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -319,11 +306,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: BottomNavigationBar(
           currentIndex: _selectedIndex < _navItems.length ? _selectedIndex : 0,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
+          backgroundColor: theme.cardColor, // 👈 Dark Mode Support
           selectedItemColor: _primary,
-          unselectedItemColor: Colors.grey.shade400,
-          selectedLabelStyle: TextStyle(fontWeight: flutter.FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: TextStyle(fontSize: 11, fontWeight: flutter.FontWeight.normal),
+          unselectedItemColor: theme.hintColor, // 👈 Dark Mode Support
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
           showUnselectedLabels: true,
           elevation: 0,
           onTap: _onNavTap,
@@ -369,46 +356,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
           BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 8)),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Positioned(
+            right: -20,
+            top: -20,
+            child: CircleAvatar(radius: 40, backgroundColor: Colors.white.withOpacity(0.1)),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_userName, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: flutter.FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text(_designation, style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: flutter.FontWeight.normal)),
-                  ],
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_userName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 4),
+                        Text(_designation, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.normal)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(_roleString, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                  )
+                ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(_roleString, style: TextStyle(color: Colors.white, fontWeight: flutter.FontWeight.bold, fontSize: 12)),
-              )
-            ],
-          ),
-          const Divider(color: Colors.white24, height: 24),
-          Row(
-            children: [
-              const Icon(Icons.apartment_outlined, color: Colors.white70, size: 16),
-              const SizedBox(width: 6),
-              Expanded(child: Text(_college, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
-              const SizedBox(width: 6),
-              Expanded(child: Text(_department, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+              const Divider(color: Colors.white24, height: 24),
+              Row(
+                children: [
+                  const Icon(Icons.apartment_outlined, color: Colors.white70, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(_college, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(_department, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
             ],
           ),
         ],
@@ -417,6 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildQuickStats() {
+    final theme = Theme.of(context);
     List<Map<String, dynamic>> stats = [];
     if (widget.userRole == UserRole.student) {
       stats = [
@@ -445,10 +442,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 140,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor, // 👈 Dark Mode Support
               borderRadius: BorderRadius.circular(18),
               boxShadow: [
-                BoxShadow(color: (s['color'] as Color).withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: (s['color'] as Color).withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4)),
               ],
             ),
             child: Column(
@@ -457,15 +454,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: (s['color'] as Color).withOpacity(0.1), shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: (s['color'] as Color).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
                   child: Icon(s['icon'] as IconData, color: s['color'] as Color, size: 16),
                 ),
                 const SizedBox(height: 8),
-                Text(s['value'] as String, style: TextStyle(fontSize: 18, fontWeight: flutter.FontWeight.bold, color: _textDark)),
+                Text(s['value'] as String, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
                 Flexible(
                   child: Text(
                     s['title'] as String,
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: flutter.FontWeight.w500),
+                    style: TextStyle(fontSize: 11, color: theme.hintColor, fontWeight: FontWeight.w500), // 👈 Dark Mode Support
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -479,10 +479,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildModuleGrid() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Quick Access", style: TextStyle(fontSize: 17, fontWeight: flutter.FontWeight.bold, color: _textDark)),
+        Text("Quick Access", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
         const SizedBox(height: 14),
         GridView.builder(
           shrinkWrap: true,
@@ -508,6 +509,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildHomeDashboardSections() {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -534,17 +536,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   width: 240,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: theme.cardColor, // 👈 Dark Mode Support
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(color: theme.dividerColor), // 👈 Dark Mode Support
                   ),
                   child: Row(
                     children: [
                       Container(
                         width: 50,
                         height: 50,
-                        decoration: BoxDecoration(color: _softBlue, borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Icons.event, color: _primary),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(colors: [_primary, _accent]),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.event, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -552,9 +557,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(index == 0 ? "Tech Fest 2024" : "Annual Sports Day", style: TextStyle(fontWeight: flutter.FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(index == 0 ? "Tech Fest 2024" : "Annual Sports Day", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis), // 👈 Dark Mode Support
                             const SizedBox(height: 4),
-                            Text(index == 0 ? "15 Dec, Auditorium" : "20 Dec, Ground", style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                            Text(index == 0 ? "15 Dec, Auditorium" : "20 Dec, Ground", style: TextStyle(fontSize: 11, color: theme.hintColor)), // 👈 Dark Mode Support
                           ],
                         ),
                       )
@@ -576,17 +581,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [Color(0xFF1A237E), Color(0xFF3949AB)]),
               borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF3949AB).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+              ],
             ),
             child: Row(
               children: [
-                const Icon(Icons.auto_awesome, color: Colors.amber, size: 24),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _isLoadingAi
                       ? const LinearProgressIndicator(color: Colors.white, backgroundColor: Colors.white24)
                       : Text(
                           _aiSuggestion,
-                          style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: flutter.FontWeight.normal),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.normal),
                         ),
                 )
               ],
@@ -598,6 +613,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSectionHeader(String title, IconData icon, VoidCallback onTap) {
+    final theme = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -605,20 +621,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Icon(icon, size: 18, color: _primary),
             const SizedBox(width: 8),
-            Text(title, style: TextStyle(fontSize: 16, fontWeight: flutter.FontWeight.bold, color: _textDark)),
+            Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
           ],
         ),
-        TextButton(onPressed: onTap, child: Text("See All", style: TextStyle(color: _primary, fontWeight: flutter.FontWeight.bold)))
+        TextButton.icon(
+          onPressed: onTap,
+          icon: const Icon(Icons.arrow_forward_ios, size: 12),
+          label: Text("See All", style: TextStyle(color: _primary, fontWeight: FontWeight.bold)),
+        )
       ],
     );
   }
 
   Widget _buildNoticeCard(String title, String time) {
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor, // 👈 Dark Mode Support
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
@@ -626,14 +647,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Row(
         children: [
-          Container(width: 4, height: 30, decoration: BoxDecoration(color: _primary, borderRadius: BorderRadius.circular(10))),
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _softBlue,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.campaign, color: _primary, size: 20),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontWeight: flutter.FontWeight.bold, color: Colors.black87)),
-                Text(time, style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
+                Text(time, style: TextStyle(fontSize: 11, color: theme.hintColor)), // 👈 Dark Mode Support
               ],
             ),
           )
@@ -641,183 +670,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-
-  Widget _buildSmartDrawer() {
-    return Drawer(
-      backgroundColor: _lightBg,
-      child: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                _buildDrawerHeader(),
-                const SizedBox(height: 8),
-                _drawerTile(Icons.home_outlined, "Home", () { Navigator.pop(context); setState(() => _selectedIndex = 0); }),
-                ..._modules.map((m) => _drawerTile(m["icon"] as IconData, m["title"] as String, () {
-                  Navigator.pop(context);
-                  (m["action"] as VoidCallback)();
-                })),
-                const Divider(height: 24, indent: 16, endIndent: 16),
-                _drawerTile(Icons.help_outline, "Help & Support", () {}),
-                _drawerTile(Icons.info_outline, "About Application", () {}),
-                _drawerTile(Icons.logout, "Logout", _showLogoutDialog, isLogout: true),
-              ],
-            ),
-          ),
-          _buildDrawerFooterVersion(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawerHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_primaryDark, _primary, _accent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Stack(
-                  children: [
-                    const CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.person, size: 35, color: _primary),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _userName,
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: flutter.FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _roleString,
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: flutter.FontWeight.bold),
-                        ),
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-            const SizedBox(height: 16),
-            _headerRow(Icons.apartment, _college),
-            const SizedBox(height: 6),
-            _headerRow(Icons.school_outlined, _department),
-            const SizedBox(height: 6),
-            _headerRow(Icons.email_outlined, _email),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _headerRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 14),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: flutter.FontWeight.normal),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDrawerFooterVersion() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 1)),
-      ),
-      child: Center(
-        child: Text(
-          "Campus Digital Twin AI\nv1.0.0 (Build 2024.12.01)",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: flutter.FontWeight.normal, height: 1.5),
-        ),
-      ),
-    );
-  }
-
-  Widget _drawerTile(IconData icon, String title, VoidCallback onTap, {bool isLogout = false}) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: isLogout ? Colors.red : _primary, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: flutter.FontWeight.normal,
-                    color: isLogout ? Colors.red : Colors.black87,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
+// ---------- Reusable Dashboard Card ----------
 class _DashboardCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -827,19 +682,20 @@ class _DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
+            color: theme.cardColor, // 👈 Dark Mode Support
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.grey.shade100),
+            border: Border.all(color: theme.dividerColor), // 👈 Dark Mode Support
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF1565C0).withOpacity(0.06),
+                color: _primary.withOpacity(0.06),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -850,8 +706,11 @@ class _DashboardCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(color: Color(0xFFE3F2FD), shape: BoxShape.circle),
-                child: Icon(icon, size: 26, color: const Color(0xFF1565C0)),
+                decoration: const BoxDecoration(
+                  color: _softBlue, // Keeping soft blue for icon background in both themes
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 26, color: _primary),
               ),
               const SizedBox(height: 8),
               Flexible(
@@ -862,7 +721,7 @@ class _DashboardCard extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: flutter.FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), // 👈 Dark Mode Support
                   ),
                 ),
               ),

@@ -23,13 +23,40 @@ class _HostelScreenState extends State<HostelScreen> {
   UserModel? get _currentUser => _authService.getCurrentUser();
   bool get _isStudent => _currentUser?.role == UserRole.student;
 
-  // Dummy Mess Menu
-  final List<Map<String, String>> _messMenu = [
-    {"time": "Breakfast", "items": "Poha, boiled eggs, bananas, tea/coffee"},
-    {"time": "Lunch", "items": "Veg Biryani, raita, salad, ice cream"},
-    {"time": "Snacks", "items": "Samosa, chai, tomato soup"},
-    {"time": "Dinner", "items": "Tandoori roti, dal makhani, paneer butter masala"},
+  // Dummy Out-Pass Requests
+  final List<Map<String, dynamic>> _outPassRequests = [
+    {"name": "Prasad Patil", "room": "Room 204", "dates": "15 Dec - 17 Dec", "status": "Pending"},
+    {"name": "Amit Kumar", "room": "Room 204", "dates": "16 Dec - 18 Dec", "status": "Pending"},
+    {"name": "Rahul Singh", "room": "Room 302", "dates": "20 Dec - 22 Dec", "status": "Approved"},
   ];
+
+  // 👇 FIX: Logic to apply for out-pass
+  void _applyOutPass() {
+    setState(() {
+      // In real app, this would send to DB. For now, just show success.
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Out-Pass Request Sent to Warden ✅"),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  // 👇 FIX: Logic to approve/reject
+  void _updateRequestStatus(int index, String newStatus) {
+    setState(() {
+      _outPassRequests[index]["status"] = newStatus;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Request $newStatus for ${_outPassRequests[index]["name"]}"),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: newStatus == "Approved" ? Colors.green : Colors.red,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,10 +106,7 @@ class _HostelScreenState extends State<HostelScreen> {
                   const Text("Block A - Room 204", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.green,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(12)),
                     child: const Text("Allocated", style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                   ),
                 ],
@@ -97,15 +121,11 @@ class _HostelScreenState extends State<HostelScreen> {
         const SizedBox(height: 24),
 
         // Out-Pass Application
-        _sectionTitle("Hostel Out-Pass (Leave)", Icons.exit_to_app_rounded),
+        const Text("Hostel Out-Pass (Leave)", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _softBlue, width: 1.2),
-          ),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), border: Border.all(color: _softBlue, width: 1.2)),
           child: Column(
             children: [
               const Text("Going home for the weekend? Apply for an out-pass below. Warden approval required.", style: TextStyle(fontSize: 13, color: Colors.black54), textAlign: TextAlign.center),
@@ -120,9 +140,7 @@ class _HostelScreenState extends State<HostelScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Out-Pass Request Sent to Warden ✅")));
-                  },
+                  onPressed: _applyOutPass, // 👈 Working
                   icon: const Icon(Icons.send_rounded),
                   label: const Text("Apply for Out-Pass", style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(backgroundColor: _primary, foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
@@ -134,9 +152,10 @@ class _HostelScreenState extends State<HostelScreen> {
         const SizedBox(height: 24),
 
         // Mess Menu
-        _sectionTitle("Today's Mess Menu", Icons.restaurant_menu_rounded),
+        const Text("Today's Mess Menu", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
         const SizedBox(height: 16),
-        ..._messMenu.map((m) => _messCard(m["time"]!, m["items"]!)).toList(),
+        _messCard("Breakfast", "Poha, boiled eggs, bananas, tea/coffee"),
+        _messCard("Lunch", "Veg Biryani, raita, salad, ice cream"),
       ],
     );
   }
@@ -160,43 +179,24 @@ class _HostelScreenState extends State<HostelScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))]),
       child: Row(
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(color: _softBlue, borderRadius: BorderRadius.circular(12)),
-            child: Icon(Icons.fastfood_outlined, color: _primary, size: 24),
-          ),
+          Container(width: 60, height: 60, decoration: BoxDecoration(color: _softBlue, borderRadius: BorderRadius.circular(12)), child: Icon(Icons.fastfood_outlined, color: _primary, size: 24)),
           const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(time, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
-                const SizedBox(height: 4),
-                Text(items, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-              ],
-            ),
-          )
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(time, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)), const SizedBox(height: 4), Text(items, style: TextStyle(fontSize: 13, color: Colors.grey.shade600))])),
         ],
       ),
     );
   }
 
   // ============================================================
-  //  ADMIN VIEW (Warden / HOD / Principal)
+  //  ADMIN VIEW (Warden)
   // ============================================================
   Widget _buildAdminView() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Occupancy Stats
         GridView.count(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -208,36 +208,33 @@ class _HostelScreenState extends State<HostelScreen> {
             _statCard("Total Rooms", "120", Icons.meeting_room_rounded, Colors.blue),
             _statCard("Occupied", "112", Icons.bed_rounded, Colors.green),
             _statCard("Vacant", "08", Icons.event_available_rounded, Colors.orange),
-            _statCard("Pending Leaves", "05", Icons.pending_actions_rounded, Colors.red),
+            _statCard("Pending Leaves", "01", Icons.pending_actions_rounded, Colors.red),
           ],
         ),
         const SizedBox(height: 24),
 
         // Pending Out-Pass Approvals
-        _sectionTitle("Pending Out-Pass Requests", Icons.exit_to_app_rounded),
+        const Text("Pending Out-Pass Requests", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
         const SizedBox(height: 16),
-        _buildOutPassCard("Prasad Patil", "Room 204", "15 Dec - 17 Dec"),
-        _buildOutPassCard("Amit Kumar", "Room 204", "16 Dec - 18 Dec"),
-        
-        const SizedBox(height: 24),
-
-        // Complaints
-        _sectionTitle("Recent Complaints", Icons.report_problem_outlined),
-        const SizedBox(height: 16),
-        _buildComplaintCard("Electrical", "Tube light not working in Room 204", Colors.orange),
-        _buildComplaintCard("Plumbing", "Tap leakage in washroom 2nd floor", Colors.blue),
+        // 👇 FIX: Dynamic List with actual Approve/Reject buttons
+        ..._outPassRequests.asMap().entries.map((entry) {
+          int index = entry.key;
+          Map<String, dynamic> req = entry.value;
+          return _buildOutPassCard(index, req);
+        }).toList(),
       ],
     );
   }
 
-  Widget _buildOutPassCard(String name, String room, String dates) {
+  Widget _buildOutPassCard(int index, Map<String, dynamic> req) {
+    bool isPending = req["status"] == "Pending";
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.orange.shade100, width: 1.5),
+        border: Border.all(color: isPending ? Colors.orange.shade100 : Colors.green.shade100, width: 1.5),
       ),
       child: Row(
         children: [
@@ -245,49 +242,34 @@ class _HostelScreenState extends State<HostelScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
-                Text("$room • $dates", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                Text(req["name"], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _textDark)),
+                Text("${req["room"]} • ${req["dates"]}", style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isPending ? Colors.orange.shade50 : Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(req["status"], style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isPending ? Colors.orange.shade700 : Colors.green.shade700)),
+                )
               ],
             ),
           ),
-          Row(
-            children: [
-              IconButton(icon: const Icon(Icons.close_rounded, color: Colors.red), onPressed: () {}),
-              IconButton(icon: const Icon(Icons.check_rounded, color: Colors.green), onPressed: () {}),
-            ],
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildComplaintCard(String type, String desc, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(Icons.build_circle_outlined, color: color, size: 24),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          // 👇 FIX: Action buttons logic
+          if (isPending)
+            Row(
               children: [
-                Text(type, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _textDark)),
-                Text(desc, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.red),
+                  onPressed: () => _updateRequestStatus(index, "Rejected"),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.check_rounded, color: Colors.green),
+                  onPressed: () => _updateRequestStatus(index, "Approved"),
+                ),
               ],
-            ),
-          ),
-          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Colors.grey),
+            )
         ],
       ),
     );
@@ -298,46 +280,21 @@ class _HostelScreenState extends State<HostelScreen> {
   // ============================================================
   Widget _infoRow(IconData icon, String text) {
     return Row(
-      children: [
-        Icon(icon, color: Colors.white70, size: 16),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500))),
-      ],
-    );
-  }
-
-  Widget _sectionTitle(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: _primary),
-        const SizedBox(width: 8),
-        Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
-      ],
+      children: [Icon(icon, color: Colors.white70, size: 16), const SizedBox(width: 8), Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)))],
     );
   }
 
   Widget _statCard(String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))]),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Icon(icon, color: color, size: 22),
           Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
-          Flexible(
-            child: Text(
-              title,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          Flexible(child: Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );

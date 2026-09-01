@@ -1,56 +1,22 @@
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 👈 FIX: Added Firestore Import
 import '../user_role.dart';
 import '../user_model.dart';
 import '../permission_model.dart';
 import '../dummy_users.dart';
 
-/// ============================================================
-///  Campus Digital Twin AI - Authentication Service
-///  Clean Architecture & SOLID Principles
-/// ============================================================
-///
-///  Provides a centralized authentication contract. The UI interacts
-///  solely with this abstraction, allowing the underlying implementation
-///  to be swapped between Dummy Data, Firebase, REST API, or Supabase
-///  without any UI changes.
-///
-/// ============================================================
-
-/// Represents the outcome of an authentication attempt.
 class AuthResult {
   final bool success;
   final String? errorMessage;
   final UserModel? user;
   final PermissionModel? permissions;
 
-  const AuthResult({
-    required this.success,
-    this.errorMessage,
-    this.user,
-    this.permissions,
-  });
-
-  /// Factory for successful login.
-  factory AuthResult.success(UserModel user, PermissionModel permissions) {
-    return AuthResult(
-      success: true,
-      user: user,
-      permissions: permissions,
-    );
-  }
-
-  /// Factory for failed login.
-  factory AuthResult.failure(String message) {
-    return AuthResult(
-      success: false,
-      errorMessage: message,
-    );
-  }
+  const AuthResult({required this.success, this.errorMessage, this.user, this.permissions});
+  factory AuthResult.success(UserModel user, PermissionModel permissions) => AuthResult(success: true, user: user, permissions: permissions);
+  factory AuthResult.failure(String message) => AuthResult(success: false, errorMessage: message);
 }
 
-/// Abstract interface for Authentication Services.
-///
-/// Implement this interface to create a new authentication backend
-/// (e.g., FirebaseAuthService, ApiAuthService, SupabaseAuthService).
 abstract class IAuthService {
   Future<AuthResult> login(String collegeId, String password);
   Future<void> logout();
@@ -61,239 +27,217 @@ abstract class IAuthService {
   String? validateCollegeId(String? collegeId);
   String? validatePassword(String? password);
   bool hasPermission(String module, String action);
+  Future<void> tryRestoreSession();
+  void updateProfile(UserModel updatedUser);
 }
 
-/// ============================================================
-///  Dummy Authentication Service Implementation
-/// ============================================================
-
-/// A concrete implementation of [IAuthService] that uses the
-/// [DummyUserRepository] to simulate backend authentication.
-///
-/// This is intended for local development and prototyping.
 class AuthService implements IAuthService {
-  // Singleton pattern for easy access across the app without DI frameworks.
   AuthService._internal();
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
 
-  // In-memory session storage.
-  // In a production environment, this would be backed by SecureStorage
-  // and SharedPreferences for session persistence.
+  final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
   UserModel? _currentUser;
   PermissionModel? _currentPermissions;
+  
+  final ValueNotifier<UserModel?> currentUserNotifier = ValueNotifier(null);
 
-  /// Authenticates a user based on College ID and Password.
-  ///
-  /// Flow:
-  /// 1. Validate inputs.
-  /// 2. Find user by College ID.
-  /// 3. Verify password.
-  /// 4. Check active status.
-  /// 5. Load permissions.
-  /// 6. Return [AuthResult].
+  UserRole _getRoleFromId(String collegeId) {
+    String id = collegeId.toUpperCase();
+    if (id.startsWith("ST")) return UserRole.student;
+    if (id.startsWith("FAC")) return UserRole.teacher;
+    if (id.startsWith("HOD")) return UserRole.hod;
+    if (id.startsWith("PRIN")) return UserRole.principal;
+    return UserRole.student;
+  }
+
+  // 👇 FIX: Robust logic to fetch and parse data from Firestore safely
+  Future<UserModel> _fetchUserData(User firebaseUser, String collegeId) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(firebaseUser.uid).get();
+      
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        
+        // Safely parse Timestamp to DateTime to avoid "bad element" crash
+        DateTime createdAt = DateTime.now();
+        if (data['createdAt'] != null) {
+          if (data['createdAt'] is Timestamp) {
+            createdAt = (data['createdAt'] as Timestamp).toDate();
+          } else if (data['createdAt'] is String) {
+            createdAt = DateTime.tryParse(data['createdAt']) ?? DateTime.now();
+          }
+        }
+
+        return UserModel(
+          id: firebaseUser.uid,
+          collegeId: data['collegeId'] ?? collegeId,
+          fullName: data['fullName'] ?? "Campus User",
+          email: data['email'] ?? firebaseUser.email ?? "",
+          password: "",
+          role: UserRole.fromString(data['role'] as String?),
+          department: data['department'] ?? "Administration",
+          designation: data['designation'] ?? "User",
+          phoneNumber: data['phoneNumber'] ?? "",
+          gender: data['gender'] ?? "",
+          address: data['address'] ?? "",
+          isActive: data['isActive'] ?? true,
+          createdAt: createdAt,
+          updatedAt: DateTime.now(),
+        );
+      } else {
+        // If document doesn't exist in Firestore, create a temporary fallback
+        UserRole role = _getRoleFromId(collegeId);
+        return UserModel(
+          id: firebaseUser.uid,
+          collegeId: collegeId,
+          fullName: "Campus User",
+          email: firebaseUser.email ?? "",
+          password: "",
+          role: role,
+          department: "Administration",
+          designation: role.name[0].toUpperCase() + role.name.substring(1),
+          phoneNumber: "",
+          gender: "",
+          address: "",
+          isActive: true,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+      }
+    } catch (e) {
+      print("❌ Firestore Fetch Error: $e");
+      // Fallback on any error so app doesn't crash
+      UserRole role = _getRoleFromId(collegeId);
+      return UserModel(
+        id: firebaseUser.uid,
+        collegeId: collegeId,
+        fullName: "Campus User",
+        email: firebaseUser.email ?? "",
+        password: "",
+        role: role,
+        department: "Administration",
+        designation: role.name[0].toUpperCase() + role.name.substring(1),
+        phoneNumber: "",
+        gender: "",
+        address: "",
+        isActive: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+    }
+  }
+
   @override
   Future<AuthResult> login(String collegeId, String password) async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 500));
+    // Convert College ID to Email format (e.g., ST2026001 -> ST2026001@campus.edu)
+    String email = "${collegeId.toUpperCase()}@campus.edu";
 
-    // 1. Validate Inputs
-    final idError = validateCollegeId(collegeId);
-    if (idError != null) return AuthResult.failure(idError);
+    try {
+      UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email, 
+        password: password
+      );
 
-    final passError = validatePassword(password);
-    if (passError != null) return AuthResult.failure(passError);
+      _currentUser = await _fetchUserData(userCredential.user!, collegeId.toUpperCase());
+      _currentPermissions = DummyUserRepository.instance.getPermissionsForUser(_currentUser!.id);
+      currentUserNotifier.value = _currentUser;
 
-    // 2. Find User
-    final user = DummyUserRepository.instance.findByCollegeId(collegeId);
-    if (user == null) {
-      return AuthResult.failure("User not found. Please check your College ID.");
+      return AuthResult.success(_currentUser!, _currentPermissions!);
+
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        return AuthResult.failure("User not found. Check College ID.");
+      } else if (e.code == 'wrong-password') {
+        return AuthResult.failure("Incorrect password.");
+      } else if (e.code == 'invalid-email') {
+        return AuthResult.failure("Invalid College ID format.");
+      }
+      return AuthResult.failure("Login failed: ${e.message}");
+    } catch (e) {
+      return AuthResult.failure("An error occurred: $e");
     }
-
-    // 3. Verify Password
-    if (user.password != password) {
-      return AuthResult.failure("Incorrect password. Please try again.");
-    }
-
-    // 4. Check Active Status
-    if (!user.isActive) {
-      return AuthResult.failure("Your account has been deactivated. Please contact administration.");
-    }
-
-    // 5. Load Permissions
-    final permissions = DummyUserRepository.instance.getPermissionsForUser(user.id);
-
-    // 6. Establish Session
-    _currentUser = user;
-    _currentPermissions = permissions;
-
-    return AuthResult.success(user, permissions);
   }
 
-  /// Clears the current session.
   @override
   Future<void> logout() async {
-    // Simulate network delay for clearing session/token revocation
-    await Future.delayed(const Duration(milliseconds: 300));
+    await _firebaseAuth.signOut();
     _currentUser = null;
     _currentPermissions = null;
+    currentUserNotifier.value = null;
   }
 
-  /// Returns the currently logged-in [UserModel], or null if not logged in.
+  @override
+  Future<void> tryRestoreSession() async {
+    User? firebaseUser = _firebaseAuth.currentUser;
+    
+    if (firebaseUser != null) {
+      String email = firebaseUser.email ?? "";
+      String collegeId = email.split("@").first;
+      
+      _currentUser = await _fetchUserData(firebaseUser, collegeId);
+      _currentPermissions = DummyUserRepository.instance.getPermissionsForUser(_currentUser!.id);
+      currentUserNotifier.value = _currentUser;
+    }
+  }
+
   @override
   UserModel? getCurrentUser() => _currentUser;
 
-  /// Returns the [UserRole] of the currently logged-in user, or null.
   @override
   UserRole? getCurrentRole() => _currentUser?.role;
 
-  /// Returns the [PermissionModel] for the current session, or null.
   @override
   PermissionModel? getCurrentPermissions() => _currentPermissions;
 
-  /// Returns true if a user is currently authenticated.
   @override
   bool get isLoggedIn => _currentUser != null;
 
-  /// Validates the College ID format before attempting login.
   @override
   String? validateCollegeId(String? collegeId) {
-    if (collegeId == null || collegeId.trim().isEmpty) {
-      return "College ID cannot be empty.";
-    }
-    if (collegeId.trim().length < 3) {
-      return "College ID seems too short.";
-    }
-    return null; // Null means valid
+    if (collegeId == null || collegeId.trim().isEmpty) return "College ID cannot be empty.";
+    if (collegeId.trim().length < 3) return "College ID too short.";
+    return null;
   }
 
-  /// Validates the Password format before attempting login.
   @override
   String? validatePassword(String? password) {
-    if (password == null || password.trim().isEmpty) {
-      return "Password cannot be empty.";
-    }
-    if (password.trim().length < 6) {
-      return "Password must be at least 6 characters.";
-    }
-    return null; // Null means valid
+    if (password == null || password.trim().isEmpty) return "Password cannot be empty.";
+    if (password.trim().length < 6) return "Password must be 6+ characters.";
+    return null;
   }
 
-  /// Checks if the current user has a specific permission.
-  ///
-  /// [module] corresponds to the module name (e.g., 'attendance', 'library').
-  /// [action] corresponds to the action (e.g., 'canView', 'canEdit').
   @override
   bool hasPermission(String module, String action) {
     if (_currentPermissions == null) return false;
-
-    ActionPermissions? targetModule;
     switch (module.toLowerCase()) {
-      case 'dashboard':
-        targetModule = _currentPermissions!.dashboard;
-        break;
-      case 'aiassistant':
-      case 'ai':
-        targetModule = _currentPermissions!.aiAssistant;
-        break;
-      case 'attendance':
-        targetModule = _currentPermissions!.attendance;
-        break;
-      case 'attendancescan':
-        targetModule = _currentPermissions!.attendanceScan;
-        break;
-      case 'timetable':
-        targetModule = _currentPermissions!.timetable;
-        break;
-      case 'library':
-        targetModule = _currentPermissions!.library;
-        break;
-      case 'canteen':
-        targetModule = _currentPermissions!.canteen;
-        break;
-      case 'placement':
-        targetModule = _currentPermissions!.placement;
-        break;
-      case 'events':
-        targetModule = _currentPermissions!.events;
-        break;
-      case 'notice':
-        targetModule = _currentPermissions!.notice;
-        break;
-      case 'digitalid':
-        targetModule = _currentPermissions!.digitalId;
-        break;
-      case 'analytics':
-        targetModule = _currentPermissions!.analytics;
-        break;
-      case 'campusmap':
-      case 'map':
-        targetModule = _currentPermissions!.campusMap;
-        break;
-      case 'profile':
-        targetModule = _currentPermissions!.profile;
-        break;
-      case 'settings':
-        targetModule = _currentPermissions!.settings;
-        break;
-      case 'reports':
-        targetModule = _currentPermissions!.reports;
-        break;
-      case 'departmentmanagement':
-        targetModule = _currentPermissions!.departmentManagement;
-        break;
-      case 'collegemanagement':
-        targetModule = _currentPermissions!.collegeManagement;
-        break;
-      case 'studentmanagement':
-        targetModule = _currentPermissions!.studentManagement;
-        break;
-      case 'teachermanagement':
-        targetModule = _currentPermissions!.teacherManagement;
-        break;
-      case 'hodmanagement':
-        targetModule = _currentPermissions!.hodManagement;
-        break;
-      case 'principalmanagement':
-        targetModule = _currentPermissions!.principalManagement;
-        break;
-      case 'usermanagement':
-        targetModule = _currentPermissions!.userManagement;
-        break;
-      case 'rolemanagement':
-        targetModule = _currentPermissions!.roleManagement;
-        break;
-      case 'permissionmanagement':
-        targetModule = _currentPermissions!.permissionManagement;
-        break;
-      default:
-        return false; // Module not found
+      case 'dashboard': return _currentPermissions!.dashboard.canView;
+      case 'aiassistant': return _currentPermissions!.aiAssistant.canView;
+      case 'attendance': return _currentPermissions!.attendance.canView;
+      case 'attendanceScan': return _currentPermissions!.attendanceScan.canView;
+      case 'timetable': return _currentPermissions!.timetable.canView;
+      case 'library': return _currentPermissions!.library.canView;
+      case 'canteen': return _currentPermissions!.canteen.canView;
+      case 'placement': return _currentPermissions!.placement.canView;
+      case 'events': return _currentPermissions!.events.canView;
+      case 'notice': return _currentPermissions!.notice.canView;
+      case 'digitalid': return _currentPermissions!.digitalId.canView;
+      case 'analytics': return _currentPermissions!.analytics.canView;
+      case 'campusmap': return _currentPermissions!.campusMap.canView;
+      case 'profile': return _currentPermissions!.profile.canView;
+      case 'settings': return _currentPermissions!.settings.canView;
+      case 'reports': return _currentPermissions!.reports.canView;
+      case 'studentmanagement': return _currentPermissions!.studentManagement.canView;
+      default: return false;
     }
+  }
 
-    switch (action.toLowerCase()) {
-      case 'canview':
-      case 'view':
-        return targetModule.canView;
-      case 'cancreate':
-      case 'create':
-        return targetModule.canCreate;
-      case 'canedit':
-      case 'edit':
-        return targetModule.canEdit;
-      case 'candelete':
-      case 'delete':
-        return targetModule.canDelete;
-      case 'canapprove':
-      case 'approve':
-        return targetModule.canApprove;
-      case 'canexport':
-      case 'export':
-        return targetModule.canExport;
-      case 'canmanage':
-      case 'manage':
-        return targetModule.canManage;
-      default:
-        return false; // Action not found
-    }
+  @override
+  void updateProfile(UserModel updatedUser) {
+    _currentUser = updatedUser;
+    currentUserNotifier.value = updatedUser;
   }
 }

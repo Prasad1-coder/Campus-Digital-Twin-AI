@@ -14,20 +14,21 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.4.0
   speech_to_text: ^7.4.0
-  google_sign_in: ^6.2.2
+  google_sign_in: ^7.2.0
   share_plus: ^13.3.0
   image_picker: ^1.2.3
   gal: ^2.3.3 # for save image in gallery
   google_generative_ai: ^0.4.7
   fl_chart: ^1.2.0
+  shared_preferences: ^2.5.5
+  firebase_core: ^4.14.0
+  firebase_auth: ^6.6.1
+  cloud_firestore: ^6.9.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true
-
-  assets:
-    - assets/campus/
