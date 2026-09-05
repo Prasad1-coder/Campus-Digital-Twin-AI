@@ -1,10 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // 👈 FIX: Added Firestore Import
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../user_role.dart';
 import '../user_model.dart';
 import '../permission_model.dart';
-import '../dummy_users.dart';
 
 class AuthResult {
   final bool success;
@@ -77,7 +76,7 @@ class AuthService implements IAuthService {
           fullName: data['fullName'] ?? "Campus User",
           email: data['email'] ?? firebaseUser.email ?? "",
           password: "",
-          role: UserRole.fromString(data['role'] as String?),
+          role: UserRole.fromString(data['role']?.toString()),
           department: data['department'] ?? "Administration",
           designation: data['designation'] ?? "User",
           phoneNumber: data['phoneNumber'] ?? "",
@@ -134,7 +133,7 @@ class AuthService implements IAuthService {
   Future<AuthResult> login(String collegeId, String password) async {
     await Future.delayed(const Duration(milliseconds: 500));
     // Convert College ID to Email format (e.g., ST2026001 -> ST2026001@campus.edu)
-    String email = "${collegeId.toUpperCase()}@campus.edu";
+    String email = "${collegeId.toLowerCase()}@campus.edu";
 
     try {
       UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
@@ -142,10 +141,31 @@ class AuthService implements IAuthService {
         password: password
       );
 
-      _currentUser = await _fetchUserData(userCredential.user!, collegeId.toUpperCase());
-      _currentPermissions = DummyUserRepository.instance.getPermissionsForUser(_currentUser!.id);
-      currentUserNotifier.value = _currentUser;
+      _currentUser = await _fetchUserData(
+  userCredential.user!,
+  collegeId.toUpperCase(),
+);
 
+_currentPermissions = switch (_currentUser!.role) {
+  UserRole.student => PermissionModel.student(
+      id: 'perm-${_currentUser!.id}',
+      ownerId: _currentUser!.id,
+    ),
+  UserRole.teacher => PermissionModel.teacher(
+      id: 'perm-${_currentUser!.id}',
+      ownerId: _currentUser!.id,
+    ),
+  UserRole.hod => PermissionModel.hod(
+      id: 'perm-${_currentUser!.id}',
+      ownerId: _currentUser!.id,
+    ),
+  UserRole.principal => PermissionModel.principal(
+      id: 'perm-${_currentUser!.id}',
+      ownerId: _currentUser!.id,
+    ),
+};
+
+currentUserNotifier.value = _currentUser;
       return AuthResult.success(_currentUser!, _currentPermissions!);
 
     } on FirebaseAuthException catch (e) {
@@ -171,18 +191,40 @@ class AuthService implements IAuthService {
   }
 
   @override
-  Future<void> tryRestoreSession() async {
-    User? firebaseUser = _firebaseAuth.currentUser;
-    
-    if (firebaseUser != null) {
-      String email = firebaseUser.email ?? "";
-      String collegeId = email.split("@").first;
-      
-      _currentUser = await _fetchUserData(firebaseUser, collegeId);
-      _currentPermissions = DummyUserRepository.instance.getPermissionsForUser(_currentUser!.id);
-      currentUserNotifier.value = _currentUser;
-    }
+Future<void> tryRestoreSession() async {
+  User? firebaseUser = _firebaseAuth.currentUser;
+
+  if (firebaseUser != null) {
+    String email = firebaseUser.email ?? "";
+    String collegeId = email.split("@").first.toUpperCase();
+
+    _currentUser = await _fetchUserData(
+      firebaseUser,
+      collegeId,
+    );
+
+    _currentPermissions = switch (_currentUser!.role) {
+      UserRole.student => PermissionModel.student(
+          id: 'perm-${_currentUser!.id}',
+          ownerId: _currentUser!.id,
+        ),
+      UserRole.teacher => PermissionModel.teacher(
+          id: 'perm-${_currentUser!.id}',
+          ownerId: _currentUser!.id,
+        ),
+      UserRole.hod => PermissionModel.hod(
+          id: 'perm-${_currentUser!.id}',
+          ownerId: _currentUser!.id,
+        ),
+      UserRole.principal => PermissionModel.principal(
+          id: 'perm-${_currentUser!.id}',
+          ownerId: _currentUser!.id,
+        ),
+    };
+
+    currentUserNotifier.value = _currentUser;
   }
+}
 
   @override
   UserModel? getCurrentUser() => _currentUser;
