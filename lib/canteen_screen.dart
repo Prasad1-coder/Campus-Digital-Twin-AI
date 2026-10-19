@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
-import 'user_model.dart';
 import 'user_role.dart';
+
+const _primary = Color(0xFF1565C0);
+const _primaryDark = Color(0xFF0D47A1);
+const _textDark = Color(0xFF1A237E);
 
 class CanteenScreen extends StatefulWidget {
   const CanteenScreen({super.key});
@@ -11,188 +14,173 @@ class CanteenScreen extends StatefulWidget {
 }
 
 class _CanteenScreenState extends State<CanteenScreen> {
-  final AuthService _authService = AuthService();
+  final _auth = AuthService();
+  bool get _isStudent => _auth.getCurrentUser()?.role == UserRole.student;
 
-  static const Color _primary = Color(0xFF1565C0);
-  static const Color _primaryDark = Color(0xFF0D47A1);
-  static const Color _lightBg = Color(0xFFF5F9FF);
-  static const Color _softBlue = Color(0xFFE3F2FD);
-  static const Color _textDark = Color(0xFF1A237E);
-
-  UserModel? get _currentUser => _authService.getCurrentUser();
-  bool get _isStudent => _currentUser?.role == UserRole.student;
-
-  // Dummy Active Token
-  int _activeToken = 42;
-  int _eta = 8;
+  int _token = 42, _eta = 8;
   bool _isPaid = false;
 
-  // Dummy Menu
-  final List<Map<String, dynamic>> _menu = [
-    {"name": "Vada Pav", "desc": "Mumbai style with chutney", "price": 25, "cat": "Snacks", "icon": Icons.lunch_dining_outlined, "color": Colors.orange},
-    {"name": "Masala Dosa", "desc": "Crispy dosa with potato filling", "price": 60, "cat": "Breakfast", "icon": Icons.dinner_dining_outlined, "color": Colors.amber},
-    {"name": "Veg Thali", "desc": "4 Rotis, Dal, Sabzi, Rice, Salad", "price": 80, "cat": "Lunch", "icon": Icons.food_bank_outlined, "color": Colors.green},
-    {"name": "Cold Coffee", "desc": "Thick and creamy", "price": 40, "cat": "Beverages", "icon": Icons.local_cafe_outlined, "color": Colors.brown},
+  // (name, price, icon, color) -- Dart 3 records
+  static const _menu = [
+    ("Vada Pav", 25, Icons.lunch_dining_outlined, Colors.orange),
+    ("Masala Dosa", 60, Icons.dinner_dining_outlined, Colors.amber),
+    ("Veg Thali", 80, Icons.food_bank_outlined, Colors.green),
+    ("Cold Coffee", 40, Icons.local_cafe_outlined, Colors.brown),
   ];
 
-  void _placeOrder(Map<String, dynamic> item) {
-    setState(() {
-      _activeToken++; // New token generated
-      _eta = 10; // Reset ETA
-      _isPaid = false; // New order needs payment
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("✅ ${item["name"]} ordered! Token No: $_activeToken"),
+  static const _stats = [
+    ("Today's Sales", "₹4,250", Icons.payments_outlined, Colors.green),
+    ("Pending Orders", "12", Icons.pending_actions, Colors.orange),
+    ("Tokens Served", "85", Icons.verified_outlined, Colors.blue),
+    ("Low Stock", "2 Items", Icons.warning_amber_rounded, Colors.red),
+  ];
+
+  void _snack(String msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg),
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.green,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+      ));
+
+  void _placeOrder(String name) {
+    setState(() {
+      _token++;
+      _eta = 10;
+      _isPaid = false;
+    });
+    _snack("✅ $name ordered! Token No: $_token");
   }
 
   void _payNow() {
     setState(() {
       _isPaid = true;
-      _eta = 5; // ETA reduces after payment
+      _eta = 5;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text("💰 Payment Successful! Order Confirmed."),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    _snack("💰 Payment Successful! Order Confirmed.");
   }
+
+  LinearGradient _grad(Color a, Color b) =>
+      LinearGradient(colors: [a, b], begin: Alignment.topLeft, end: Alignment.bottomRight);
+
+  BoxShadow _shadow(Color c, double o, double blur) =>
+      BoxShadow(color: c.withOpacity(o), blurRadius: blur, offset: Offset(0, blur / 2));
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _lightBg,
-      appBar: AppBar(
-        elevation: 0,
-        toolbarHeight: 70,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [_primaryDark, _primary], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF5F9FF),
+        appBar: AppBar(
+          elevation: 0,
+          toolbarHeight: 70,
+          backgroundColor: Colors.transparent,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: _grad(_primaryDark, _primary),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+            ),
           ),
+          title: const Text("Smart Canteen",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 19)),
         ),
-        title: const Text("Smart Canteen", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 19)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: _isStudent ? _buildStudentView() : _buildAdminView(),
-      ),
-    );
-  }
-
-  // ============================================================
-  //  STUDENT VIEW
-  // ============================================================
-  Widget _buildStudentView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Active Token Card
-        Container(
-          width: double.infinity,
+        body: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [_primary, _primaryDark], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 8))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("Active Token", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _isPaid ? Colors.green : Colors.orange,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(_isPaid ? "Paid" : "Payment Due", style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text("Token No.", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text("#A$_activeToken", style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text("Ready in", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text("$_eta Min", style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                    ],
-                  )
-                ],
-              ),
-              const SizedBox(height: 16),
-              // 👇 FIX: Pay Now Button Working
-              if (!_isPaid)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _payNow,
-                    icon: const Icon(Icons.payment_rounded),
-                    label: const Text("Pay Now (₹120)", style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: _primaryDark,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          child: _isStudent ? _studentView() : _adminView(),
         ),
-        const SizedBox(height: 24),
+      );
 
-        // Menu Section
-        const Text("Today's Menu", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _menu.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+  // ---------------- STUDENT ----------------
+  Widget _studentView() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _tokenCard(),
+          const SizedBox(height: 24),
+          const Text("Today's Menu",
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _textDark)),
+          const SizedBox(height: 16),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             childAspectRatio: 0.85,
+            children: _menu.map(_foodCard).toList(),
           ),
-          itemBuilder: (context, index) {
-            final food = _menu[index];
-            return _buildFoodCard(food);
-          },
-        ),
-      ],
-    );
-  }
+        ],
+      );
 
-  Widget _buildFoodCard(Map<String, dynamic> food) {
+  Widget _tokenCard() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: _grad(_primary, _primaryDark),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [_shadow(_primary, 0.35, 16)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Active Token",
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _isPaid ? Colors.green : Colors.orange,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(_isPaid ? "Paid" : "Payment Due",
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _info("Token No.", "#A$_token", 32, CrossAxisAlignment.start),
+                _info("Ready in", "$_eta Min", 24, CrossAxisAlignment.end),
+              ],
+            ),
+            if (!_isPaid) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _payNow,
+                  icon: const Icon(Icons.payment_rounded),
+                  label: const Text("Pay Now (₹120)", style: TextStyle(fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: _primaryDark,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+
+  Widget _info(String label, String value, double size, CrossAxisAlignment align) => Column(
+        crossAxisAlignment: align,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(value,
+              style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.bold)),
+        ],
+      );
+
+  Widget _foodCard((String, int, IconData, Color) f) {
+    final (name, price, icon, color) = f;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [_shadow(Colors.black, 0.04, 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,78 +188,64 @@ class _CanteenScreenState extends State<CanteenScreen> {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: (food["color"] as Color).withOpacity(0.1),
+                color: color.withOpacity(0.1),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              child: Center(
-                child: Icon(food["icon"] as IconData, size: 40, color: food["color"] as Color),
-              ),
+              child: Center(child: Icon(icon, size: 40, color: color)),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(food["name"], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(name,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _textDark),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 4),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text("₹${food["price"]}", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _primary)),
-                    // 👇 FIX: Order Button Working
+                    Text("₹$price",
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _primary)),
                     GestureDetector(
-                      onTap: () => _placeOrder(food),
+                      onTap: () => _placeOrder(name),
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
                         child: const Icon(Icons.add, color: Colors.white, size: 16),
                       ),
-                    )
+                    ),
                   ],
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  // ============================================================
-  //  ADMIN VIEW (Canteen Manager)
-  // ============================================================
-  Widget _buildAdminView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 1.6,
-          children: [
-            _buildStatCard("Today's Sales", "₹4,250", Icons.payments_outlined, Colors.green),
-            _buildStatCard("Pending Orders", "12", Icons.pending_actions, Colors.orange),
-            _buildStatCard("Tokens Served", "85", Icons.verified_outlined, Colors.blue),
-            _buildStatCard("Low Stock", "2 Items", Icons.warning_amber_rounded, Colors.red),
-          ],
-        ),
-        const SizedBox(height: 24),
-        // Can add order management list here in future
-      ],
-    );
-  }
+  // ---------------- ADMIN ----------------
+  Widget _adminView() => GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1.6,
+        children: _stats.map(_statCard).toList(),
+      );
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _statCard((String, String, IconData, Color) s) {
+    final (title, value, icon, color) = s;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [_shadow(color, 0.1, 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,14 +253,10 @@ class _CanteenScreenState extends State<CanteenScreen> {
         children: [
           Icon(icon, color: color, size: 22),
           Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: _textDark)),
-          Flexible(
-            child: Text(
-              title,
+          Text(title,
               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );

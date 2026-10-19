@@ -1,7 +1,7 @@
 import 'dart:convert';
+
 import 'user_role.dart';
 
-/// Represents a user within the Campus Digital Twin AI system.
 class UserModel {
   final String id;
   final String collegeId;
@@ -11,16 +11,29 @@ class UserModel {
   final UserRole role;
   final String department;
   final String designation;
+
+  // Academic / Class information
+  final String program;
+  final String classId;
+  final String className;
+  final String academicYearId;
+  final String academicYear;
+
   final int? semester;
   final String? division;
   final String? rollNumber;
+
   final String phoneNumber;
   final String gender;
+
   final DateTime? dateOfBirth;
   final String? profileImageUrl;
+
   final String address;
   final bool isActive;
+
   final DateTime? lastLogin;
+
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -33,16 +46,29 @@ class UserModel {
     required this.role,
     required this.department,
     required this.designation,
+
+    // Academic fields
+    this.program = '',
+    this.classId = '',
+    this.className = '',
+    this.academicYearId = '',
+    this.academicYear = '',
+
     this.semester,
     this.division,
     this.rollNumber,
+
     required this.phoneNumber,
     required this.gender,
+
     this.dateOfBirth,
     this.profileImageUrl,
+
     required this.address,
     required this.isActive,
+
     this.lastLogin,
+
     required this.createdAt,
     required this.updatedAt,
   });
@@ -56,16 +82,28 @@ class UserModel {
     UserRole? role,
     String? department,
     String? designation,
+
+    String? program,
+    String? classId,
+    String? className,
+    String? academicYearId,
+    String? academicYear,
+
     int? semester,
     String? division,
     String? rollNumber,
+
     String? phoneNumber,
     String? gender,
+
     DateTime? dateOfBirth,
     String? profileImageUrl,
+
     String? address,
     bool? isActive,
+
     DateTime? lastLogin,
+
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -78,16 +116,28 @@ class UserModel {
       role: role ?? this.role,
       department: department ?? this.department,
       designation: designation ?? this.designation,
+
+      program: program ?? this.program,
+      classId: classId ?? this.classId,
+      className: className ?? this.className,
+      academicYearId: academicYearId ?? this.academicYearId,
+      academicYear: academicYear ?? this.academicYear,
+
       semester: semester ?? this.semester,
       division: division ?? this.division,
       rollNumber: rollNumber ?? this.rollNumber,
+
       phoneNumber: phoneNumber ?? this.phoneNumber,
       gender: gender ?? this.gender,
+
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+
       address: address ?? this.address,
       isActive: isActive ?? this.isActive,
+
       lastLogin: lastLogin ?? this.lastLogin,
+
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -99,20 +149,34 @@ class UserModel {
       'collegeId': collegeId,
       'fullName': fullName,
       'email': email,
-      'password': password,
+
+      // Password is intentionally NOT stored in Firestore.
       'role': role.toJson(),
       'department': department,
       'designation': designation,
+
+      // Academic fields
+      'program': program,
+      'classId': classId,
+      'className': className,
+      'academicYearId': academicYearId,
+      'academicYear': academicYear,
+
       'semester': semester,
       'division': division,
       'rollNumber': rollNumber,
+
       'phoneNumber': phoneNumber,
       'gender': gender,
+
       'dateOfBirth': dateOfBirth?.toIso8601String(),
       'profileImageUrl': profileImageUrl,
+
       'address': address,
       'isActive': isActive,
+
       'lastLogin': lastLogin?.toIso8601String(),
+
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -120,41 +184,129 @@ class UserModel {
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
     return UserModel(
-      id: map['id'] as String,
-      collegeId: map['collegeId'] as String,
-      fullName: map['fullName'] as String,
-      email: map['email'] as String,
+      id: map['id'] as String? ?? '',
+      collegeId: map['collegeId'] as String? ?? '',
+      fullName: map['fullName'] as String? ?? '',
+      email: map['email'] as String? ?? '',
       password: map['password'] as String? ?? '',
-      role: UserRole.fromString(map['role'] as String?),
+
+      role: UserRole.fromString(
+        map['role'] as String?,
+      ),
+
       department: map['department'] as String? ?? '',
       designation: map['designation'] as String? ?? '',
-      semester: map['semester'] as int?,
+
+      // Academic fields
+      program: map['program'] as String? ?? '',
+      classId: map['classId'] as String? ?? '',
+      className: map['className'] as String? ?? '',
+      academicYearId: map['academicYearId'] as String? ?? '',
+      academicYear: map['academicYear'] as String? ?? '',
+
+      semester: _parseSemester(map['semester']),
       division: map['division'] as String?,
       rollNumber: map['rollNumber'] as String?,
+
       phoneNumber: map['phoneNumber'] as String? ?? '',
       gender: map['gender'] as String? ?? '',
-      dateOfBirth: map['dateOfBirth'] != null ? DateTime.parse(map['dateOfBirth'] as String) : null,
+
+      dateOfBirth: _parseDate(map['dateOfBirth']),
       profileImageUrl: map['profileImageUrl'] as String?,
+
       address: map['address'] as String? ?? '',
       isActive: map['isActive'] as bool? ?? true,
-      lastLogin: map['lastLogin'] != null ? DateTime.parse(map['lastLogin'] as String) : null,
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
-      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt'] as String) : DateTime.now(),
+
+      lastLogin: _parseDate(map['lastLogin']),
+
+      createdAt:
+          _parseDate(map['createdAt']) ?? DateTime.now(),
+
+      updatedAt:
+          _parseDate(map['updatedAt']) ?? DateTime.now(),
     );
   }
 
-  String toJson() => json.encode(toMap());
+  String toJson() {
+    return json.encode(toMap());
+  }
 
-  factory UserModel.fromJson(String source) => UserModel.fromMap(json.decode(source) as Map<String, dynamic>);
+  factory UserModel.fromJson(String source) {
+    return UserModel.fromMap(
+      json.decode(source) as Map<String, dynamic>,
+    );
+  }
+
+  static int? _parseSemester(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is int) {
+      return value;
+    }
+
+    return int.tryParse(value.toString());
+  }
+
+  static DateTime? _parseDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    // Firestore Timestamp support without requiring
+    // a direct cloud_firestore import here.
+    try {
+      final dynamic date = value.toDate();
+
+      if (date is DateTime) {
+        return date;
+      }
+    } catch (_) {
+      // Ignore invalid date values.
+    }
+
+    return null;
+  }
 
   @override
   String toString() {
-    return 'UserModel(id: $id, collegeId: $collegeId, fullName: $fullName, email: $email, role: $role, department: $department, designation: $designation, semester: $semester, division: $division, rollNumber: $rollNumber, phoneNumber: $phoneNumber, gender: $gender, isActive: $isActive)';
+    return 'UserModel('
+        'id: $id, '
+        'collegeId: $collegeId, '
+        'fullName: $fullName, '
+        'email: $email, '
+        'role: $role, '
+        'department: $department, '
+        'designation: $designation, '
+        'program: $program, '
+        'classId: $classId, '
+        'className: $className, '
+        'academicYearId: $academicYearId, '
+        'academicYear: $academicYear, '
+        'semester: $semester, '
+        'division: $division, '
+        'rollNumber: $rollNumber, '
+        'phoneNumber: $phoneNumber, '
+        'gender: $gender, '
+        'isActive: $isActive'
+        ')';
   }
 
   @override
   bool operator ==(Object other) {
-    if (identical(this, other)) return true;
+    if (identical(this, other)) {
+      return true;
+    }
+
     return other is UserModel &&
         other.id == id &&
         other.collegeId == collegeId &&
@@ -164,6 +316,11 @@ class UserModel {
         other.role == role &&
         other.department == department &&
         other.designation == designation &&
+        other.program == program &&
+        other.classId == classId &&
+        other.className == className &&
+        other.academicYearId == academicYearId &&
+        other.academicYear == academicYear &&
         other.semester == semester &&
         other.division == division &&
         other.rollNumber == rollNumber &&
@@ -180,8 +337,32 @@ class UserModel {
 
   @override
   int get hashCode {
-    return Object.hash(
-      id, collegeId, fullName, email, password, role, department, designation, semester, division, rollNumber, phoneNumber, gender, dateOfBirth, profileImageUrl, address, isActive, lastLogin, createdAt, updatedAt
-    );
+    return Object.hashAll([
+      id,
+      collegeId,
+      fullName,
+      email,
+      password,
+      role,
+      department,
+      designation,
+      program,
+      classId,
+      className,
+      academicYearId,
+      academicYear,
+      semester,
+      division,
+      rollNumber,
+      phoneNumber,
+      gender,
+      dateOfBirth,
+      profileImageUrl,
+      address,
+      isActive,
+      lastLogin,
+      createdAt,
+      updatedAt,
+    ]);
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/gemini_service.dart';
@@ -8,6 +9,24 @@ import 'services/auth_service.dart';
 import 'user_model.dart';
 import 'user_role.dart';
 
+// ---------- Same colour palette (unchanged) ----------
+const Color _primary = Color(0xFF1565C0);
+const Color _primaryDark = Color(0xFF0D47A1);
+const Color _accent = Color(0xFF42A5F5);
+const Color _lightBg = Color(0xFFF5F9FF);
+const Color _softBlue = Color(0xFFE3F2FD);
+const Color _textDark = Color(0xFF1A237E);
+
+// Helpers so light + dark mode both look good
+Color _tintOf(ThemeData theme) =>
+    theme.brightness == Brightness.dark ? _primary.withOpacity(0.20) : _softBlue;
+
+Color _iconOf(ThemeData theme) =>
+    theme.brightness == Brightness.dark ? _accent : _primary;
+
+Color _headingOf(ThemeData theme) =>
+    theme.brightness == Brightness.dark ? theme.colorScheme.onSurface : _textDark;
+
 class AIScreen extends StatefulWidget {
   const AIScreen({super.key});
 
@@ -15,7 +34,10 @@ class AIScreen extends StatefulWidget {
   State<AIScreen> createState() => _AIScreenState();
 }
 
-class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
+class _AIScreenState extends State<AIScreen> {
+  // =====================================================================
+  // 1. STATE & DATA
+  // =====================================================================
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late stt.SpeechToText _speech;
@@ -31,17 +53,8 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
   final List<Map<String, dynamic>> _messages = [];
   GlobalKey<_TypingTextState>? _currentTypingKey;
 
-  // ---------- Theme ----------
-  static const Color _primary = Color(0xFF1565C0);
-  static const Color _primaryDark = Color(0xFF0D47A1);
-  static const Color _lightBg = Color(0xFFF5F9FF);
-  static const Color _softBlue = Color(0xFFE3F2FD);
-  static const Color _textDark = Color(0xFF1A237E);
-
-  late final AnimationController _fadeController;
-
   String get _userName => _currentUser?.fullName.split(' ').first ?? "Guest";
-  
+
   String get _roleString {
     final role = _currentUser?.role.name;
     if (role == null || role.isEmpty) return "Guest";
@@ -86,16 +99,14 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
     }
   }
 
+  // =====================================================================
+  // 2. LOGIC (unchanged)
+  // =====================================================================
   @override
   void initState() {
     super.initState();
     _speech = stt.SpeechToText();
     _initSpeech();
-
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    )..forward();
   }
 
   void _initSpeech() async {
@@ -216,6 +227,7 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
 
     try {
       String reply = await GeminiService.askAI(question);
+      if (!mounted) return; // screen was closed while waiting
       final key = GlobalKey<_TypingTextState>();
       _currentTypingKey = key;
 
@@ -231,6 +243,7 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
         });
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _messages.add({"sender": "AI", "text": "⚠️ Error: $e\nPlease try again.", "animate": false, "time": _getCurrentTime()});
@@ -257,25 +270,33 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
   void _clearChat() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text("Clear Chat?", style: TextStyle(fontWeight: FontWeight.bold, color: _textDark)),
-        content: const Text("Are you sure you want to clear this conversation?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() => _messages.clear());
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-            child: const Text("Clear"),
-          ),
-        ],
-      ),
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Text("Clear Chat?", style: TextStyle(fontWeight: FontWeight.w800, color: _headingOf(theme))),
+          content: const Text("Are you sure you want to clear this conversation?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text("Cancel", style: TextStyle(color: theme.hintColor)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() => _messages.clear());
+                Navigator.pop(dialogContext);
+              },
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text("Clear"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -291,170 +312,158 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
     _controller.dispose();
     _scrollController.dispose();
     _speech.stop();
-    _fadeController.dispose();
     super.dispose();
   }
 
+  // =====================================================================
+  // 3. BUILD (screen skeleton)
+  // =====================================================================
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
     final bool showEmptyState = _messages.isEmpty;
 
-    return Scaffold(
-      backgroundColor: _lightBg,
-      appBar: AppBar(
-        elevation: 0,
-        toolbarHeight: 70,
-        backgroundColor: Colors.transparent,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_primaryDark, _primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
-          ),
-        ),
-        title: Row(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: isDark ? theme.scaffoldBackgroundColor : _lightBg,
+        body: Column(
           children: [
-            Stack(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), shape: BoxShape.circle),
-                  child: const Icon(Icons.smart_toy_rounded, size: 20, color: Colors.white),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: Colors.greenAccent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: _primaryDark, width: 2),
-                    ),
-                  ),
-                )
-              ],
-            ),
-            const SizedBox(width: 12),
+            _buildHeader(),
+
+            // Quick suggestions stay handy once the chat has started
+            if (!showEmptyState) _buildSuggestionBar(),
+
             Expanded(
+              child: showEmptyState ? _buildEmptyState() : _buildMessageList(),
+            ),
+
+            // SafeArea keeps the input clear of the floating nav bar / system bar
+            SafeArea(
+              top: false,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text("Campus AI Assistant", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text("Online • $_userName ($_roleString)", style: const TextStyle(fontSize: 10.5, color: Colors.white70, fontWeight: FontWeight.w500)),
+                  if (_isListening) _buildListeningChip(),
+                  if (_isTyping) _buildStopButton(),
+                  _buildInputArea(),
                 ],
               ),
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history_rounded, color: Colors.white),
-            tooltip: "Chat History",
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Chat history feature is ready for backend integration.")),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined, color: Colors.white),
-            tooltip: "Clear Chat",
-            onPressed: _messages.isEmpty ? null : _clearChat,
-          ),
-          const SizedBox(width: 4),
+      ),
+    );
+  }
+
+  // =====================================================================
+  // 4. HEADER (compact, blueprint style)
+  // =====================================================================
+  Widget _buildHeader() {
+    // Back button only when this screen was pushed (not when it is a tab)
+    final bool canGoBack = Navigator.of(context).canPop();
+
+    return Container(
+      width: double.infinity,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_primary, _accent],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(26)),
+        boxShadow: [
+          BoxShadow(color: _primary.withOpacity(0.25), blurRadius: 18, offset: const Offset(0, 8)),
         ],
       ),
-      body: Column(
+      child: Stack(
         children: [
-          // Quick Suggestions Bar
-          Container(
-            margin: const EdgeInsets.fromLTRB(16, 16, 0, 8),
-            height: 42,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _suggestedCommands.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final cmd = _suggestedCommands[index];
-                return _CommandChip(
-                  icon: cmd["icon"]!,
-                  label: cmd["label"]!,
-                  onTap: _isLoading ? null : () => _sendQuickCommand(cmd["command"]!),
-                );
-              },
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              controller: _scrollController,
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-              children: [
-                ..._messages.map((message) {
-                  bool me = message["sender"] == "You";
-                  bool animate = message["animate"] == true;
-
-                  return FadeTransition(
-                    opacity: _fadeController,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0, 0.1),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(parent: _fadeController, curve: Curves.easeOut)),
-                      child: _buildMessageBubble(message, me, animate),
-                    ),
-                  );
-                }).toList(),
-                if (showEmptyState) _EmptyStateSuggestionCard(onCommandTap: _sendQuickCommand, suggestions: _suggestedCommands),
-                if (_isLoading) _buildTypingIndicatorBubble(),
-              ],
-            ),
-          ),
-          // 👇 FIX: Wrapped bottom section in SafeArea to prevent keyboard/system bar from overlapping
+          Positioned.fill(child: CustomPaint(painter: _HeaderGridPainter())),
           SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isListening)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                          const SizedBox(width: 8),
-                          Text("Listening...", style: TextStyle(color: Colors.red.shade600, fontStyle: FontStyle.italic, fontSize: 12.5, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 12, 16),
+              child: Row(
+                children: [
+                  if (canGoBack) ...[
+                    _headerButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      tooltip: "Back",
+                      onTap: () => Navigator.of(context).maybePop(),
                     ),
-                  ),
-                if (_isTyping)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: OutlinedButton.icon(
-                        onPressed: _stopTyping,
-                        icon: const Icon(Icons.stop_circle_outlined, size: 18),
-                        label: const Text("Stop generating"),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    const SizedBox(width: 10),
+                  ],
+
+                  // AI avatar with online dot
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        ),
+                        child: const Icon(Icons.smart_toy_rounded, size: 22, color: Colors.white),
+                      ),
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            color: Colors.greenAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: _primary, width: 2),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Campus AI Assistant",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          "Online • $_userName ($_roleString)",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11.5, color: Colors.white70, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
-                _buildInputArea(),
-              ],
+                  const SizedBox(width: 8),
+                  _headerButton(
+                    icon: Icons.history_rounded,
+                    tooltip: "Chat History",
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Chat history feature is ready for backend integration.")),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _headerButton(
+                    icon: Icons.delete_sweep_outlined,
+                    tooltip: "Clear Chat",
+                    onTap: _messages.isEmpty ? null : _clearChat,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -462,37 +471,132 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _headerButton({required IconData icon, required String tooltip, required VoidCallback? onTap}) {
+    final bool enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withOpacity(enabled ? 0.16 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: enabled ? Colors.white : Colors.white38, size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // =====================================================================
+  // 5. SUGGESTIONS (chips + empty state)
+  // =====================================================================
+  Widget _buildSuggestionBar() {
+    final cmds = _suggestedCommands;
+    return SizedBox(
+      height: 58,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        itemCount: cmds.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cmd = cmds[index];
+          return _CommandChip(
+            icon: cmd["icon"]!,
+            label: cmd["label"]!,
+            onTap: _isLoading ? null : () => _sendQuickCommand(cmd["command"]!),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: _EmptyStateSuggestionCard(
+        userName: _userName,
+        onCommandTap: _sendQuickCommand,
+        suggestions: _suggestedCommands,
+      ),
+    );
+  }
+
+  // =====================================================================
+  // 6. MESSAGES
+  // =====================================================================
+  Widget _buildMessageList() {
+    final int extra = _isLoading ? 1 : 0;
+
+    return ListView.builder(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+      itemCount: _messages.length + extra,
+      itemBuilder: (context, index) {
+        // last item = "AI is thinking" bubble
+        if (index >= _messages.length) return _buildTypingIndicatorBubble();
+
+        final message = _messages[index];
+        final bool me = message["sender"] == "You";
+        final bool animate = message["animate"] == true;
+
+        // each new message fades + slides in once
+        return TweenAnimationBuilder<double>(
+          key: ValueKey('msg-$index'),
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOut,
+          builder: (context, value, child) {
+            return Opacity(
+              opacity: value,
+              child: Transform.translate(offset: Offset(0, (1 - value) * 12), child: child),
+            );
+          },
+          child: _buildMessageBubble(message, me, animate),
+        );
+      },
+    );
+  }
+
   Widget _buildMessageBubble(Map<String, dynamic> message, bool me, bool animate) {
-    String text = message["text"]!;
+    final theme = Theme.of(context);
+    final String text = message["text"] as String;
+    final Color textColor = me ? Colors.white : theme.colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisAlignment: me ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          if (!me) _Avatar(isAI: true),
+          if (!me) const _Avatar(isAI: true),
           if (!me) const SizedBox(width: 8),
           Flexible(
             child: Column(
               crossAxisAlignment: me ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                Container(
+                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
                   decoration: BoxDecoration(
                     gradient: me ? const LinearGradient(colors: [_primary, _primaryDark]) : null,
-                    color: me ? null : Colors.white,
+                    color: me ? null : theme.cardColor,
+                    border: me ? null : Border.all(color: theme.dividerColor.withOpacity(0.6)),
                     borderRadius: BorderRadius.only(
                       topLeft: const Radius.circular(20),
                       topRight: const Radius.circular(20),
-                      bottomLeft: Radius.circular(me ? 20 : 4),
-                      bottomRight: Radius.circular(me ? 4 : 20),
+                      bottomLeft: Radius.circular(me ? 20 : 6),
+                      bottomRight: Radius.circular(me ? 6 : 20),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: me ? _primary.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+                        color: me ? _primary.withOpacity(0.25) : Colors.black.withOpacity(0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 4),
                       ),
@@ -502,49 +606,34 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
                       ? TypingText(
                           key: message["key"] ?? ValueKey(text),
                           text: text,
-                          style: TextStyle(
-                            color: me ? Colors.white : Colors.black87,
-                            fontSize: 14.5,
-                            height: 1.4,
-                          ),
+                          style: TextStyle(color: textColor, fontSize: 14.5, height: 1.42),
                           onCharacterTyped: _scrollDuringTyping,
                           onFinished: _onTypingFinished,
                         )
                       : Text(
                           text,
-                          style: TextStyle(
-                            color: me ? Colors.white : Colors.black87,
-                            fontSize: 14.5,
-                            height: 1.4,
-                          ),
+                          style: TextStyle(color: textColor, fontSize: 14.5, height: 1.42),
                         ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+                  padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        message["time"]!,
-                        style: TextStyle(fontSize: 10, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                        message["time"] as String,
+                        style: TextStyle(fontSize: 10.5, color: theme.hintColor, fontWeight: FontWeight.w500),
                       ),
                       if (!me) ...[
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () => _copyMessage(text),
-                          child: Icon(Icons.copy_rounded, size: 14, color: Colors.grey.shade400),
-                        ),
-                        const SizedBox(width: 8),
-                        InkWell(
-                          onTap: () {
-                            // Regenerate logic placeholder
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Regenerating response..."), duration: Duration(seconds: 1)),
-                            );
-                          },
-                          child: Icon(Icons.refresh_rounded, size: 14, color: Colors.grey.shade400),
-                        ),
-                      ]
+                        const SizedBox(width: 6),
+                        _bubbleAction(Icons.copy_rounded, "Copy", () => _copyMessage(text)),
+                        _bubbleAction(Icons.refresh_rounded, "Regenerate", () {
+                          // Regenerate logic placeholder
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Regenerating response..."), duration: Duration(seconds: 1)),
+                          );
+                        }),
+                      ],
                     ],
                   ),
                 ),
@@ -552,101 +641,189 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
             ),
           ),
           if (me) const SizedBox(width: 8),
-          if (me) _Avatar(isAI: false),
+          if (me) const _Avatar(isAI: false),
         ],
       ),
     );
   }
 
+  // small tappable icon under an AI message (bigger tap area than the icon)
+  Widget _bubbleAction(IconData icon, String tooltip, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Icon(icon, size: 15, color: theme.hintColor),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTypingIndicatorBubble() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          _Avatar(isAI: true),
+          const _Avatar(isAI: true),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: theme.cardColor,
+              border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(20),
                 topRight: Radius.circular(20),
+                bottomLeft: Radius.circular(6),
                 bottomRight: Radius.circular(20),
               ),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (index) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(color: _primary, shape: BoxShape.circle),
-                );
-              }),
-            ),
+            child: const _TypingDots(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInputArea() {
+  // =====================================================================
+  // 7. INPUT AREA
+  // =====================================================================
+  Widget _buildListeningChip() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 8), // Reduced bottom padding, SafeArea handles the rest
+      padding: const EdgeInsets.fromLTRB(18, 6, 18, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+              const SizedBox(width: 8),
+              Text(
+                "Listening...",
+                style: TextStyle(color: Colors.red.shade600, fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStopButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: OutlinedButton.icon(
+        onPressed: _stopTyping,
+        icon: const Icon(Icons.stop_circle_outlined, size: 18),
+        label: const Text("Stop generating", style: TextStyle(fontWeight: FontWeight.w700)),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.red,
+          side: BorderSide(color: Colors.red.withOpacity(0.6)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.8)),
           boxShadow: [
-            BoxShadow(color: _primary.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4)),
+            BoxShadow(color: _primary.withOpacity(0.10), blurRadius: 18, offset: const Offset(0, 6)),
           ],
         ),
         child: Row(
           children: [
             IconButton(
+              tooltip: "Attach",
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Attachment feature is ready for PDF/Image analysis.")),
                 );
               },
-              icon: Icon(Icons.attach_file_rounded, color: Colors.grey.shade500),
+              icon: Icon(Icons.attach_file_rounded, color: theme.hintColor, size: 22),
             ),
             Expanded(
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(fontSize: 14.5, color: Colors.black87),
+                style: TextStyle(fontSize: 14.5, color: theme.colorScheme.onSurface),
                 decoration: InputDecoration(
                   hintText: _isListening ? "Listening..." : "Message Campus AI...",
-                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  hintStyle: TextStyle(color: theme.hintColor, fontSize: 14),
                   border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),
-            IconButton(
-              onPressed: _isLoading ? null : _toggleListening,
-              icon: Icon(
-                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                color: _isListening ? Colors.red : _primary,
+            const SizedBox(width: 4),
+
+            // Mic
+            Material(
+              color: _isListening ? Colors.red.withOpacity(0.12) : _tintOf(theme),
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: _isLoading ? null : _toggleListening,
+                child: SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: Icon(
+                    _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                    color: _isListening ? Colors.red : _iconOf(theme),
+                    size: 22,
+                  ),
+                ),
               ),
             ),
-            Container(
-              margin: const EdgeInsets.only(left: 4),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(colors: [_primary, _primaryDark]),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                onPressed: _isLoading ? null : _sendMessage,
-                icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
+            const SizedBox(width: 6),
+
+            // Send
+            Opacity(
+              opacity: _isLoading ? 0.5 : 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_primary, _primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: _isLoading ? null : _sendMessage,
+                    child: const SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -654,6 +831,41 @@ class _AIScreenState extends State<AIScreen> with TickerProviderStateMixin {
       ),
     );
   }
+}
+
+// =====================================================================
+//  HEADER BACKGROUND (blueprint grid + corner rings, same as other screens)
+// =====================================================================
+class _HeaderGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grid = Paint()
+      ..color = Colors.white.withOpacity(0.06)
+      ..strokeWidth = 1;
+    const step = 28.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+
+    // Rings from the top-right corner
+    final ring = Paint()
+      ..color = Colors.white.withOpacity(0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final center = Offset(size.width - 16, 0);
+    for (final r in [36.0, 64.0, 92.0]) {
+      canvas.drawCircle(center, r, ring);
+    }
+
+    final dot = Paint()..color = Colors.white.withOpacity(0.45);
+    canvas.drawCircle(Offset(center.dx - 45, center.dy + 45), 3, dot);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 // ============================================================
@@ -667,19 +879,74 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 30,
-      height: 30,
+      width: 32,
+      height: 32,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: isAI ? [const Color(0xFF1565C0), const Color(0xFF0D47A1)] : [Colors.grey.shade400, Colors.grey.shade600],
+          colors: isAI ? const [_primary, _primaryDark] : [Colors.grey.shade400, Colors.grey.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(11),
       ),
       child: Icon(
         isAI ? Icons.smart_toy_rounded : Icons.person_rounded,
-        size: 16,
+        size: 17,
         color: Colors.white,
       ),
+    );
+  }
+}
+
+// three bouncing dots while the AI is thinking
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color dotColor = _iconOf(Theme.of(context));
+
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final double phase = (_anim.value - i * 0.15) % 1.0;
+            final double lift = math.sin(phase * math.pi); // 0 → 1 → 0
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2.5),
+              child: Transform.translate(
+                offset: Offset(0, -4 * lift),
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: dotColor.withOpacity(0.4 + 0.6 * lift),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
@@ -693,25 +960,32 @@ class _CommandChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFFE3F2FD),
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: const Color(0xFF1565C0).withOpacity(0.2)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(icon, style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 6),
-              Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
-            ],
+    final theme = Theme.of(context);
+    return Opacity(
+      opacity: onTap == null ? 0.55 : 1,
+      child: Material(
+        color: _tintOf(theme),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _primary.withOpacity(0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(icon, style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _iconOf(theme)),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -720,57 +994,80 @@ class _CommandChip extends StatelessWidget {
 }
 
 class _EmptyStateSuggestionCard extends StatelessWidget {
+  final String userName;
   final Function(String) onCommandTap;
   final List<Map<String, String>> suggestions;
 
-  const _EmptyStateSuggestionCard({required this.onCommandTap, required this.suggestions});
+  const _EmptyStateSuggestionCard({
+    required this.userName,
+    required this.onCommandTap,
+    required this.suggestions,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 24),
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(14), // <-- Box ka main padding kam kiya (20 se 14)
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF1565C0).withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 8)),
+          BoxShadow(color: _primary.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, 8)),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Color(0xFF1565C0), Color(0xFF0D47A1)]),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+          Container(
+            width: 44, // <-- Icon size kam kiya (52 se 44)
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_primary, _primaryDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
-                  "How can I help you today?",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A237E)),
-                ),
-              ),
-            ],
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 22), // <-- Icon size 26 se 22
           ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: suggestions.map((action) {
-              return _QuickActionButton(
+          const SizedBox(height: 10), // <-- Spacing kam kiya (16 se 10)
+          Text(
+            "Hi $userName 👋",
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.hintColor),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            "How can I help you today?",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _headingOf(theme)), // <-- Font size 20 se 18
+          ),
+          const SizedBox(height: 2),
+          Text(
+            "Tap a suggestion or type your own question.",
+            style: TextStyle(fontSize: 12, color: theme.hintColor),
+          ),
+          const SizedBox(height: 12), // <-- Spacing kam kiya (18 se 12)
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: suggestions.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 8, // <-- Spacing kam kiya (10 se 8)
+              mainAxisSpacing: 8,
+              mainAxisExtent: 54, // <-- Grid item height kam kiya (62 se 54)
+            ),
+            itemBuilder: (context, index) {
+              final action = suggestions[index];
+              return _SuggestionTile(
                 icon: action["icon"]!,
                 label: action["label"]!,
                 onTap: () => onCommandTap(action["command"]!),
               );
-            }).toList(),
+            },
           ),
         ],
       ),
@@ -778,33 +1075,49 @@ class _EmptyStateSuggestionCard extends StatelessWidget {
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
+class _SuggestionTile extends StatelessWidget {
   final String icon;
   final String label;
   final VoidCallback onTap;
 
-  const _QuickActionButton({required this.icon, required this.label, required this.onTap});
+  const _SuggestionTile({required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Material(
-      color: const Color(0xFFF5F9FF),
-      borderRadius: BorderRadius.circular(14),
+      color: _tintOf(theme).withOpacity(theme.brightness == Brightness.dark ? 0.6 : 0.55),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 8), // <-- Padding kam kiya (10 se 8)
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _primary.withOpacity(0.12)),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(icon, style: const TextStyle(fontSize: 16)),
-              const SizedBox(width: 8),
-              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87)),
+              Container(
+                width: 32, // <-- Icon box size kam kiya (36 se 32)
+                height: 32,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(icon, style: const TextStyle(fontSize: 16)), // <-- Emoji font size 18 se 16
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, height: 1.15, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface),
+                ),
+              ),
             ],
           ),
         ),
@@ -813,6 +1126,9 @@ class _QuickActionButton extends StatelessWidget {
   }
 }
 
+// ============================================================
+//  TYPING TEXT (typewriter effect - unchanged)
+// ============================================================
 class TypingText extends StatefulWidget {
   final String text;
   final TextStyle? style;

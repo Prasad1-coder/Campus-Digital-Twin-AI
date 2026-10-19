@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'ai_screen.dart';
 import 'profile_screen.dart';
 import 'map_screen.dart';
@@ -22,15 +23,24 @@ import 'user_role.dart';
 import 'permission_model.dart';
 import 'fees_screen.dart';
 import 'hostel_screen.dart';
-import 'drawer_widget.dart'; 
-import 'admin_panel_screen.dart'; 
+import 'drawer_widget.dart';
+import 'admin_panel_screen.dart';
+import 'services/hod/subject_management_screen.dart';
+import 'services/hod/teacher_assignment_screen.dart';
 
-// 👇 FIX: Global Colors so _DashboardCard can access them
+// ---------- Same colour palette (unchanged) ----------
 const Color _primary = Color(0xFF1565C0);
 const Color _primaryDark = Color(0xFF0D47A1);
 const Color _accent = Color(0xFF42A5F5);
 const Color _softBlue = Color(0xFFE3F2FD);
 const Color _textDark = Color(0xFF1A237E);
+
+// Helpers so light + dark mode both look good
+Color _tintOf(ThemeData theme) =>
+    theme.brightness == Brightness.dark ? _primary.withOpacity(0.20) : _softBlue;
+
+Color _iconOf(ThemeData theme) =>
+    theme.brightness == Brightness.dark ? _accent : _primary;
 
 class DashboardScreen extends StatefulWidget {
   final UserRole userRole;
@@ -62,7 +72,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       String role = widget.userRole.name;
       String prompt = "Give one short (max 15 words), highly encouraging and actionable tip for a $role to improve their campus life and studies. Do not include any conversational filler, just the tip.";
       String reply = await GeminiService.askAI(prompt);
-      
+
       if (mounted) {
         setState(() {
           _aiSuggestion = reply.isNotEmpty ? reply : "Stay focused and make the most of your campus resources today!";
@@ -72,8 +82,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _aiSuggestion = widget.userRole == UserRole.student 
-              ? "Your attendance is below 75%. Attend the next class to avoid debarment." 
+          _aiSuggestion = widget.userRole == UserRole.student
+              ? "Your attendance is below 75%. Attend the next class to avoid debarment."
               : "You have 2 pending leave approvals. Review them in the Attendance section.";
           _isLoadingAi = false;
         });
@@ -89,13 +99,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   String get _userName => _currentUser?.fullName.split(' ').first ?? "Guest";
-  
+  String get _fullName => _currentUser?.fullName ?? "Guest";
+  String get _initial => _userName.isNotEmpty ? _userName[0].toUpperCase() : "G";
+
   String get _roleString {
     final role = _currentUser?.role.name;
     if (role == null || role.isEmpty) return "Guest";
     return role[0].toUpperCase() + role.substring(1);
   }
-  
+
   String get _department => _currentUser?.department ?? "Department";
   String get _designation => _currentUser?.designation ?? "Role";
   String get _college => "XYZ Campus of Excellence";
@@ -116,20 +128,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _openSettings() => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
   void _openNotice() => Navigator.push(context, MaterialPageRoute(builder: (_) => NoticeScreen(userRole: widget.userRole)));
   void _openEvents() => Navigator.push(context, MaterialPageRoute(builder: (_) => EventsScreen(userRole: widget.userRole, currentUserName: _userName)));
-  void _openDigitalId() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalIdScreen())); // 👈 const works now
+  void _openDigitalId() => Navigator.push(context, MaterialPageRoute(builder: (_) => const DigitalIdScreen()));
   void _openPlacement() => Navigator.push(context, MaterialPageRoute(builder: (_) => const PlacementDashboardScreen()));
   void _openExams() => Navigator.push(context, MaterialPageRoute(builder: (_) => const ExaminationScreen()));
   void _openAnalytics() => Navigator.push(context, MaterialPageRoute(builder: (_) => AnalyticsDashboardScreen()));
   void _openFees() => Navigator.push(context, MaterialPageRoute(builder: (_) => const FeesScreen()));
-  void _openHostel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HostelScreen())); 
-  void _openAdminPanel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen())); 
-  
+  void _openHostel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const HostelScreen()));
+  void _openAdminPanel() => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen()));
+
+  void _openSubjectManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const SubjectManagementScreen(),
+      ),
+    );
+  }
+
+  void _openTeacherAssignments() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TeacherAssignmentScreen(),
+      ),
+    );
+  }
+
   void _openSearch() => Navigator.push(context, MaterialPageRoute(builder: (_) => GlobalSearchScreen()));
   void _openNotifications() => Navigator.push(context, MaterialPageRoute(builder: (_) => NotificationScreen()));
 
   List<Map<String, dynamic>> get _modules {
     final List<Map<String, dynamic>> list = [];
-    
+
     if (_hasAccess('aiassistant', 'canView')) {
       list.add({"title": "AI Assistant", "icon": Icons.smart_toy_outlined, "action": _openAI});
     }
@@ -172,46 +202,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_hasAccess('attendance', 'canView')) {
       list.add({"title": "Exams", "icon": Icons.assignment_turned_in_outlined, "action": _openExams});
     }
-    if (_hasAccess('attendance', 'canView')) { 
+    if (_hasAccess('attendance', 'canView')) {
       list.add({"title": "Fees", "icon": Icons.account_balance_wallet_outlined, "action": _openFees});
     }
-    if (_hasAccess('attendance', 'canView')) { 
-      list.add({"title": "Hostel", "icon": Icons.apartment_outlined, "action": _openHostel}); 
+    if (_hasAccess('attendance', 'canView')) {
+      list.add({"title": "Hostel", "icon": Icons.apartment_outlined, "action": _openHostel});
     }
-    
+
+    if (_currentUser?.role == UserRole.hod) {
+      list.add({
+        "title": "Subject Management",
+        "icon": Icons.menu_book_outlined,
+        "action": _openSubjectManagement,
+      });
+      list.add({
+        "title": "Teacher Assignment",
+        "icon": Icons.assignment_ind_outlined,
+        "action": _openTeacherAssignments,
+      });
+    }
+
     if (_currentUser?.role == UserRole.hod || _currentUser?.role == UserRole.principal) {
       list.add({"title": "Admin Panel", "icon": Icons.admin_panel_settings_outlined, "action": _openAdminPanel});
     }
-    
+
     list.add({"title": "Profile", "icon": Icons.person_outline, "action": _openProfile});
     list.add({"title": "Settings", "icon": Icons.settings_outlined, "action": _openSettings});
-    
+
     return list;
   }
 
   List<BottomNavigationBarItem> get _navItems {
     List<BottomNavigationBarItem> items = [];
-    
+
     items.add(const BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: "Home"));
-    
+
     if (_hasAccess('aiassistant', 'canView')) {
       items.add(const BottomNavigationBarItem(icon: Icon(Icons.smart_toy_outlined), label: "AI"));
     }
-    
+
     if (_hasAccess('attendance', 'canView')) {
       items.add(const BottomNavigationBarItem(icon: Icon(Icons.fact_check_outlined), label: "Attendance"));
     } else if (_hasAccess('analytics', 'canView')) {
       items.add(const BottomNavigationBarItem(icon: Icon(Icons.insights_outlined), label: "Analytics"));
     }
-    
+
     items.add(const BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: "Profile"));
-    
+
     return items;
   }
 
   List<Widget> get _screens {
     List<Widget> screens = [_buildHomeContent()];
-    
+
     if (_hasAccess('aiassistant', 'canView')) {
       screens.add(const AIScreen());
     }
@@ -220,9 +263,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } else if (_hasAccess('analytics', 'canView')) {
       screens.add(AnalyticsDashboardScreen());
     }
-    
+
     screens.add(ProfileScreen(role: widget.userRole));
-    
+
     return screens;
   }
 
@@ -230,45 +273,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _selectedIndex = index);
   }
 
+  // =====================================================================
+  //                               BUILD
+  // =====================================================================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    int safeIndex = _selectedIndex < _navItems.length ? _selectedIndex : 0;
+    final navItems = _navItems; // computed once per build
+    final screens = _screens;
+    final int safeIndex = _selectedIndex < navItems.length ? _selectedIndex : 0;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor, // 👈 Dark Mode Support
+      backgroundColor: theme.scaffoldBackgroundColor,
       extendBody: true,
       appBar: AppBar(
-        toolbarHeight: 70,
+        toolbarHeight: 66,
         automaticallyImplyLeading: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        // Flat gradient - it flows straight into the header card below
         flexibleSpace: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               colors: [_primaryDark, _primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
           ),
         ),
         leading: Builder(
           builder: (context) => IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white),
+            tooltip: "Menu",
+            icon: const Icon(Icons.menu_rounded, color: Colors.white),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: Text(
-          safeIndex == 0 ? "$_greeting, $_userName 👋" : _navItems[safeIndex].label!,
-          style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        titleSpacing: 0,
+        title: safeIndex == 0
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _greeting,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _userName,
+                    style: const TextStyle(fontSize: 19, color: Colors.white, fontWeight: FontWeight.w700, letterSpacing: 0.2),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              )
+            : Text(
+                navItems[safeIndex].label!,
+                style: const TextStyle(fontSize: 19, color: Colors.white, fontWeight: FontWeight.w700),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
         centerTitle: false,
         actions: [
-          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: _openSearch),
-          IconButton(icon: const Icon(Icons.notifications_outlined, color: Colors.white), onPressed: _openNotifications),
+          IconButton(
+            tooltip: "Search",
+            style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.14)),
+            icon: const Icon(Icons.search_rounded, color: Colors.white),
+            onPressed: _openSearch,
+          ),
+          const SizedBox(width: 6),
+          IconButton(
+            tooltip: "Notifications",
+            style: IconButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.14)),
+            icon: const Icon(Icons.notifications_none_rounded, color: Colors.white),
+            onPressed: _openNotifications,
+          ),
+          const SizedBox(width: 12),
         ],
       ),
       drawer: AppDrawer(
@@ -278,148 +360,260 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _onNavTap(index);
         },
       ),
-      bottomNavigationBar: _buildCleanBottomNav(),
+      // Hide the floating nav while the keyboard is open (AI chat input stays above the keyboard)
+      bottomNavigationBar: MediaQuery.of(context).viewInsets.bottom > 0
+          ? null
+          : _buildFloatingNav(navItems, safeIndex),
       body: IndexedStack(
         index: safeIndex,
-        children: _screens,
+        children: screens,
       ),
     );
   }
 
-  Widget _buildCleanBottomNav() {
+  // =====================================================================
+  //                        FLOATING PILL NAV BAR
+  // =====================================================================
+  Widget _buildFloatingNav(List<BottomNavigationBarItem> items, int current) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      decoration: BoxDecoration(
-        color: theme.cardColor, // 👈 Dark Mode Support
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: _primary.withOpacity(0.15),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BottomNavigationBar(
-          currentIndex: _selectedIndex < _navItems.length ? _selectedIndex : 0,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: theme.cardColor, // 👈 Dark Mode Support
-          selectedItemColor: _primary,
-          unselectedItemColor: theme.hintColor, // 👈 Dark Mode Support
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-          unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
-          showUnselectedLabels: true,
-          elevation: 0,
-          onTap: _onNavTap,
-          items: _navItems,
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        height: 64,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withOpacity(0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: List.generate(items.length, (i) {
+            final selected = i == current;
+            final iconData = (items[i].icon as Icon).icon;
+            return Expanded(
+              flex: selected ? 2 : 1, // selected tab gets more room for its label
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(22),
+                  onTap: () => _onNavTap(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: selected ? _primary : Colors.transparent,
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          iconData,
+                          size: 22,
+                          color: selected ? Colors.white : theme.hintColor,
+                        ),
+                        if (selected) ...[
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              items[i].label ?? "",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );
   }
 
+  // =====================================================================
+  //                              HOME TAB
+  // =====================================================================
   Widget _buildHomeContent() {
     return SafeArea(
+      bottom: false, // Scaffold already reserves space for the nav bar (extendBody)
       child: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 120),
+        padding: const EdgeInsets.only(bottom: 110),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeaderCard(),
-            const SizedBox(height: 24),
-            _buildQuickStats(),
-            const SizedBox(height: 24),
-            _buildModuleGrid(),
-            const SizedBox(height: 24),
-            _buildHomeDashboardSections(),
+            // Header card + stats strip that overlaps its bottom edge
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _buildHeaderCard(),
+                Positioned(
+                  left: 18,
+                  right: 18,
+                  bottom: -38,
+                  child: _buildQuickStats(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 62),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildModuleGrid(),
+                  const SizedBox(height: 26),
+                  _buildHomeDashboardSections(),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  // ---------- Header: blueprint-style identity panel ----------
   Widget _buildHeaderCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [_primary, _accent],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
         boxShadow: [
-          BoxShadow(color: _primary.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 8)),
+          BoxShadow(color: _primary.withOpacity(0.25), blurRadius: 20, offset: const Offset(0, 10)),
         ],
       ),
       child: Stack(
         children: [
-          Positioned(
-            right: -20,
-            top: -20,
-            child: CircleAvatar(radius: 40, backgroundColor: Colors.white.withOpacity(0.1)),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_userName, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 4),
-                        Text(_designation, style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.normal)),
-                      ],
+          // Campus "digital twin" blueprint grid in the background
+          Positioned.fill(child: CustomPaint(painter: _BlueprintPainter())),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 64),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.16),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.white.withOpacity(0.35)),
+                      ),
+                      child: Text(
+                        _initial,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800),
+                      ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _fullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            _designation,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Text(_roleString, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  )
-                ],
-              ),
-              const Divider(color: Colors.white24, height: 24),
-              Row(
-                children: [
-                  const Icon(Icons.apartment_outlined, color: Colors.white70, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(_college, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(_department, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                ],
-              ),
-            ],
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white.withOpacity(0.28)),
+                      ),
+                      child: Text(
+                        _roleString,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    const Icon(Icons.apartment_outlined, color: Colors.white70, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _college,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.school_outlined, color: Colors.white70, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _department,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
+  // ---------- Stats: one joined strip instead of 3 separate cards ----------
   Widget _buildQuickStats() {
     final theme = Theme.of(context);
     List<Map<String, dynamic>> stats = [];
     if (widget.userRole == UserRole.student) {
       stats = [
         {"title": "Attendance", "value": "85%", "icon": Icons.percent, "color": Colors.green},
-        {"title": "CGPA", "value": "8.4", "icon": Icons.star, "color": Colors.orange},
-        {"title": "Books Due", "value": "1", "icon": Icons.menu_book, "color": Colors.red},
+        {"title": "CGPA", "value": "8.4", "icon": Icons.star_rounded, "color": Colors.orange},
+        {"title": "Books Due", "value": "1", "icon": Icons.menu_book_rounded, "color": Colors.red},
       ];
     } else {
       stats = [
@@ -429,74 +623,90 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
     }
 
-    return SizedBox(
-      height: 110,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        itemCount: stats.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final s = stats[index];
-          return Container(
-            width: 140,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.cardColor, // 👈 Dark Mode Support
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(color: (s['color'] as Color).withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4)),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: (s['color'] as Color).withOpacity(0.15),
-                    shape: BoxShape.circle,
+    final List<Widget> cells = [];
+    for (int i = 0; i < stats.length; i++) {
+      final s = stats[i];
+      final Color c = s['color'] as Color;
+      if (i > 0) {
+        cells.add(Container(width: 1, height: 40, color: theme.dividerColor));
+      }
+      cells.add(
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(s['icon'] as IconData, color: c, size: 16),
+                  const SizedBox(width: 5),
+                  Text(
+                    s['value'] as String,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
                   ),
-                  child: Icon(s['icon'] as IconData, color: s['color'] as Color, size: 16),
-                ),
-                const SizedBox(height: 8),
-                Text(s['value'] as String, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
-                Flexible(
-                  child: Text(
-                    s['title'] as String,
-                    style: TextStyle(fontSize: 11, color: theme.hintColor, fontWeight: FontWeight.w500), // 👈 Dark Mode Support
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                s['title'] as String,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.5, color: theme.hintColor, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      height: 84,
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 18, offset: const Offset(0, 8)),
+        ],
       ),
+      child: Row(children: cells),
     );
   }
 
+  // ---------- Quick Access: launcher-style icon tiles ----------
   Widget _buildModuleGrid() {
     final theme = Theme.of(context);
+    final modules = _modules; // computed once
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Quick Access", style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              "Quick Access",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
+            ),
+            const Spacer(),
+            Text(
+              "${modules.length} modules",
+              style: TextStyle(fontSize: 12, color: theme.hintColor, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
         const SizedBox(height: 14),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _modules.length,
+          itemCount: modules.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.0,
+            crossAxisCount: 4,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 10,
+            mainAxisExtent: 102,
           ),
           itemBuilder: (context, index) {
-            final module = _modules[index];
+            final module = modules[index];
             return _DashboardCard(
               title: module["title"] as String,
               icon: module["icon"] as IconData,
@@ -508,171 +718,334 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // ---------- Notices / Events / AI tip ----------
   Widget _buildHomeDashboardSections() {
     final theme = Theme.of(context);
+
+    const notices = [
+      {"title": "Campus Workshop on AI & ML", "time": "2 hours ago"},
+      {"title": "Placement Drive - TCS Digital", "time": "5 hours ago"},
+    ];
+
+    const events = [
+      {"day": "15", "month": "Dec", "title": "Tech Fest 2024", "place": "Auditorium"},
+      {"day": "20", "month": "Dec", "title": "Annual Sports Day", "place": "Ground"},
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_hasAccess('notice', 'canView')) ...[
           _buildSectionHeader("Recent Notices", Icons.campaign_outlined, _openNotice),
-          const SizedBox(height: 8),
-          _buildNoticeCard("Campus Workshop on AI & ML", "2 hours ago"),
-          _buildNoticeCard("Placement Drive - TCS Digital", "5 hours ago"),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
+          // All notices live inside ONE grouped list (not separate cards)
+          Container(
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                for (int i = 0; i < notices.length; i++) ...[
+                  if (i > 0) Divider(height: 1, indent: 68, color: theme.dividerColor.withOpacity(0.7)),
+                  _buildNoticeCard(notices[i]["title"]!, notices[i]["time"]!),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 26),
         ],
 
         if (_hasAccess('events', 'canView')) ...[
           _buildSectionHeader("Upcoming Events", Icons.celebration_outlined, _openEvents),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SizedBox(
-            height: 100,
+            height: 92,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              itemCount: 2,
+              itemCount: events.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                return Container(
-                  width: 240,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: theme.cardColor, // 👈 Dark Mode Support
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: theme.dividerColor), // 👈 Dark Mode Support
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [_primary, _accent]),
-                          borderRadius: BorderRadius.circular(12),
+                final e = events[index];
+                return InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _openEvents,
+                  child: Container(
+                    width: 250,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: theme.dividerColor.withOpacity(0.6)),
+                    ),
+                    child: Row(
+                      children: [
+                        // Calendar-style date block
+                        Container(
+                          width: 58,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_primary, _accent],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                e["day"]!,
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.1),
+                              ),
+                              Text(
+                                e["month"]!,
+                                style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: const Icon(Icons.event, color: Colors.white),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(index == 0 ? "Tech Fest 2024" : "Annual Sports Day", style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis), // 👈 Dark Mode Support
-                            const SizedBox(height: 4),
-                            Text(index == 0 ? "15 Dec, Auditorium" : "20 Dec, Ground", style: TextStyle(fontSize: 11, color: theme.hintColor)), // 👈 Dark Mode Support
-                          ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                e["title"]!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: theme.colorScheme.onSurface),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on_outlined, size: 14, color: theme.hintColor),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      e["place"]!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 12, color: theme.hintColor),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      )
-                    ],
+                      ],
+                    ),
                   ),
                 );
               },
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 26),
         ],
 
         _buildSectionHeader("AI Suggestions", Icons.smart_toy_outlined, _openAI),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: _openAI,
-          child: Container(
-            padding: const EdgeInsets.all(16),
+        const SizedBox(height: 10),
+        Material(
+          color: Colors.transparent,
+          child: Ink(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1A237E), Color(0xFF3949AB)]),
-              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                colors: [_textDark, Color(0xFF3949AB)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
               boxShadow: [
-                BoxShadow(color: const Color(0xFF3949AB).withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+                BoxShadow(color: const Color(0xFF3949AB).withOpacity(0.30), blurRadius: 14, offset: const Offset(0, 6)),
               ],
             ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: _openAI,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Today's tip",
+                            style: TextStyle(color: Colors.white60, fontSize: 11.5, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          _isLoadingAi
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: const LinearProgressIndicator(
+                                    minHeight: 4,
+                                    color: Colors.white,
+                                    backgroundColor: Colors.white24,
+                                  ),
+                                )
+                              : Text(
+                                  _aiSuggestion,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13.5, height: 1.4),
+                                ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white60),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _isLoadingAi
-                      ? const LinearProgressIndicator(color: Colors.white, backgroundColor: Colors.white24)
-                      : Text(
-                          _aiSuggestion,
-                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.normal),
-                        ),
-                )
-              ],
+              ),
             ),
           ),
-        )
+        ),
       ],
     );
   }
 
+  // ---------- Section header with "See all" pill ----------
   Widget _buildSectionHeader(String title, IconData icon, VoidCallback onTap) {
     final theme = Theme.of(context);
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 18, color: _primary),
-            const SizedBox(width: 8),
-            Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
-          ],
+        Icon(icon, size: 20, color: _iconOf(theme)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: theme.colorScheme.onSurface),
+          ),
         ),
-        TextButton.icon(
-          onPressed: onTap,
-          icon: const Icon(Icons.arrow_forward_ios, size: 12),
-          label: Text("See All", style: TextStyle(color: _primary, fontWeight: FontWeight.bold)),
-        )
+        InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+            decoration: BoxDecoration(
+              color: _tintOf(theme),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("See all", style: TextStyle(color: _iconOf(theme), fontWeight: FontWeight.w700, fontSize: 12)),
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right_rounded, size: 16, color: _iconOf(theme)),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
 
+  // ---------- One row inside the grouped notice list ----------
   Widget _buildNoticeCard(String title, String time) {
     final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: theme.cardColor, // 👈 Dark Mode Support
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: _softBlue,
-              borderRadius: BorderRadius.circular(10),
+    return InkWell(
+      onTap: _openNotice,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: _tintOf(theme),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: Icon(Icons.campaign_rounded, color: _iconOf(theme), size: 22),
             ),
-            child: const Icon(Icons.campaign, color: _primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)), // 👈 Dark Mode Support
-                Text(time, style: TextStyle(fontSize: 11, color: theme.hintColor)), // 👈 Dark Mode Support
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: theme.colorScheme.onSurface),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 12, color: theme.hintColor),
+                      const SizedBox(width: 4),
+                      Text(time, style: TextStyle(fontSize: 11.5, color: theme.hintColor)),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          )
-        ],
+            Icon(Icons.chevron_right_rounded, color: theme.hintColor, size: 20),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ---------- Reusable Dashboard Card ----------
+// =====================================================================
+//        Blueprint background (grid + radar rings) for header
+// =====================================================================
+class _BlueprintPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Fine grid
+    final grid = Paint()
+      ..color = Colors.white.withOpacity(0.06)
+      ..strokeWidth = 1;
+    const step = 28.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+
+    // Concentric rings in the top-right corner
+    final ring = Paint()
+      ..color = Colors.white.withOpacity(0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    final center = Offset(size.width - 30, 24);
+    for (final r in [36.0, 64.0, 92.0]) {
+      canvas.drawCircle(center, r, ring);
+    }
+
+    // Small "nodes" sitting on the rings
+    final dot = Paint()..color = Colors.white.withOpacity(0.45);
+    canvas.drawCircle(Offset(center.dx - 36, center.dy), 3, dot);
+    canvas.drawCircle(Offset(center.dx, center.dy + 64), 3, dot);
+    canvas.drawCircle(Offset(center.dx - 92, center.dy), 3, dot);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// =====================================================================
+//                 Reusable Dashboard Tile (launcher style)
+// =====================================================================
 class _DashboardCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -686,47 +1059,37 @@ class _DashboardCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: theme.cardColor, // 👈 Dark Mode Support
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: theme.dividerColor), // 👈 Dark Mode Support
-            boxShadow: [
-              BoxShadow(
-                color: _primary.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: _tintOf(theme),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: _primary.withOpacity(0.10)),
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: _softBlue, // Keeping soft blue for icon background in both themes
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 26, color: _primary),
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface), // 👈 Dark Mode Support
-                  ),
+              child: Icon(icon, size: 26, color: _iconOf(theme)),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
