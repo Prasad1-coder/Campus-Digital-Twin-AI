@@ -310,7 +310,6 @@ class PermissionModel {
         other.id == id && other.ownerId == ownerId && other.dashboard == dashboard && other.aiAssistant == aiAssistant && other.attendance == attendance && other.attendanceScan == attendanceScan && other.timetable == timetable && other.library == library && other.canteen == canteen && other.placement == placement && other.events == events && other.notice == notice && other.digitalId == digitalId && other.analytics == analytics && other.campusMap == campusMap && other.profile == profile && other.settings == settings && other.reports == reports && other.departmentManagement == departmentManagement && other.collegeManagement == collegeManagement && other.studentManagement == studentManagement && other.teacherManagement == teacherManagement && other.hodManagement == hodManagement && other.principalManagement == principalManagement && other.userManagement == userManagement && other.roleManagement == roleManagement && other.permissionManagement == permissionManagement;
   }
 
-  // 👇 FIX: Used Object.hashAll to handle more than 20 arguments
   @override
   int get hashCode {
     return Object.hashAll([

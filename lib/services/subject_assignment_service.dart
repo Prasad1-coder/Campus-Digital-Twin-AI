@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '/subject_assignment_model.dart';
 
 class SubjectAssignmentService {
@@ -10,9 +9,7 @@ class SubjectAssignmentService {
       get _assignments =>
           _firestore.collection('subject_assignments');
 
-  // ============================================================
   // CREATE
-  // ============================================================
 
   Future<String> createAssignment(
     SubjectAssignmentModel assignment,
@@ -26,9 +23,7 @@ class SubjectAssignmentService {
     return docRef.id;
   }
 
-  // ============================================================
   // UPDATE
-  // ============================================================
 
   Future<void> updateAssignment(
     SubjectAssignmentModel assignment,
@@ -39,9 +34,7 @@ class SubjectAssignmentService {
     });
   }
 
-  // ============================================================
   // ACTIVE / INACTIVE
-  // ============================================================
 
   Future<void> setAssignmentStatus(
     String assignmentId,
@@ -53,9 +46,7 @@ class SubjectAssignmentService {
     });
   }
 
-  // ============================================================
   // GET SINGLE ASSIGNMENT
-  // ============================================================
 
   Future<SubjectAssignmentModel?> getAssignment(
     String assignmentId,
@@ -74,9 +65,7 @@ class SubjectAssignmentService {
     );
   }
 
-  // ============================================================
   // TEACHER ASSIGNMENTS
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getTeacherAssignments(
@@ -104,9 +93,7 @@ class SubjectAssignmentService {
         .toList();
   }
 
-  // ============================================================
   // TEACHER ASSIGNMENTS FOR SPECIFIC CLASS
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getTeacherClassAssignments({
@@ -144,9 +131,7 @@ class SubjectAssignmentService {
         .toList();
   }
 
-  // ============================================================
   // DEPARTMENT ASSIGNMENTS
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getDepartmentAssignments(
@@ -170,9 +155,7 @@ class SubjectAssignmentService {
         .toList();
   }
 
-  // ============================================================
   // CLASS ASSIGNMENTS
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getClassAssignments({
@@ -204,10 +187,7 @@ class SubjectAssignmentService {
         )
         .toList();
   }
-
-  // ============================================================
   // CLASS + DIVISION + SEMESTER
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getClassDivisionAssignments({
@@ -250,10 +230,8 @@ class SubjectAssignmentService {
         .toList();
   }
 
-  // ============================================================
   // DEPARTMENT + CLASS
-  // ============================================================
-
+  
   Future<List<SubjectAssignmentModel>>
       getDepartmentClassAssignments({
     required String department,
@@ -285,10 +263,7 @@ class SubjectAssignmentService {
         )
         .toList();
   }
-
-  // ============================================================
   // LEGACY / COMPATIBILITY METHOD
-  // ============================================================
 
   Future<List<SubjectAssignmentModel>>
       getLegacyClassAssignments({
@@ -330,10 +305,7 @@ class SubjectAssignmentService {
         )
         .toList();
   }
-
-  // ============================================================
   // CHECK TEACHER ASSIGNMENT
-  // ============================================================
 
   Future<bool> isTeacherAssigned({
     required String teacherId,
@@ -377,11 +349,7 @@ class SubjectAssignmentService {
 
     return snapshot.docs.isNotEmpty;
   }
-
-  // ============================================================
   // DELETE
-  // ============================================================
-
   Future<void> deleteAssignment(
     String assignmentId,
   ) async {

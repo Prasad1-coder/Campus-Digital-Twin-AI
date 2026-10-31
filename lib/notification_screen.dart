@@ -13,8 +13,7 @@ class NotificationScreen extends StatefulWidget {
 class _NotificationScreenState extends State<NotificationScreen> {
   final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
-  
-  // ---------- Theme Constants ----------
+
   static const Color _primary = Color(0xFF1565C0);
   static const Color _primaryDark = Color(0xFF0D47A1);
   static const Color _lightBg = Color(0xFFF5F9FF);
@@ -26,47 +25,38 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   int _selectedCategoryIndex = 0;
   final List<String> _categories = [
-    "All", "Academic", "Attendance", "Placement", "Library", 
+    "All", "Academic", "Attendance", "Placement", "Library",
     "Events", "Canteen", "Fees", "Emergency", "System"
   ];
 
-  // ---------- Dummy Data ----------
   final List<Map<String, dynamic>> _allNotifications = [
-    // Student Specific
     {"id": "N1", "title": "Low Attendance Warning", "msg": "Your attendance in DBMS is below 75%. Please attend the next lecture.", "cat": "Attendance", "priority": "High", "time": "10:30 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.student]},
     {"id": "N2", "title": "Library Book Due", "msg": "'Clean Code' is due tomorrow. Please return it to avoid fine.", "cat": "Library", "priority": "Medium", "time": "09:15 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.student, UserRole.teacher]},
     {"id": "N3", "title": "TCS Placement Drive", "msg": "TCS is visiting campus on 15th Dec. Register before 12th Dec.", "cat": "Placement", "priority": "High", "time": "Yesterday", "date": "Yesterday", "isRead": true, "isPinned": false, "roles": [UserRole.student]},
     {"id": "N4", "title": "Timetable Changed", "msg": "Tomorrow's DBMS lecture is rescheduled to 2:00 PM.", "cat": "Academic", "priority": "Medium", "time": "Yesterday", "date": "Yesterday", "isRead": false, "isPinned": false, "roles": [UserRole.student, UserRole.teacher]},
-    
-    // Teacher Specific
+
     {"id": "N5", "title": "Pending Attendance", "msg": "You have not marked attendance for SE Computer Div A (9:00 AM).", "cat": "Attendance", "priority": "High", "time": "11:00 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.teacher, UserRole.hod]},
     {"id": "N6", "title": "Department Meeting", "msg": "HOD has scheduled a department meeting at 3:00 PM in the cabin.", "cat": "Academic", "priority": "Medium", "time": "10:00 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.teacher]},
-    
-    // HOD Specific
+
     {"id": "N7", "title": "Approval Request: Tech Fest", "msg": "Prof. Sharma has submitted a draft notice for Tech Fest 2024.", "cat": "System", "priority": "Medium", "time": "08:45 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.hod]},
     {"id": "N8", "title": "Dept Analytics Ready", "msg": "Monthly department attendance analytics report is ready to view.", "cat": "Academic", "priority": "Low", "time": "Yesterday", "date": "Yesterday", "isRead": true, "isPinned": false, "roles": [UserRole.hod, UserRole.principal]},
-    
-    // Principal Specific
+
     {"id": "N9", "title": "Emergency: Power Outage", "msg": "Main power grid is down. Generator backup activated. Classes suspended till 12 PM.", "cat": "Emergency", "priority": "Critical", "time": "09:00 AM", "date": "Today", "isRead": false, "isPinned": true, "roles": [UserRole.principal, UserRole.hod, UserRole.teacher, UserRole.student]},
     {"id": "N10", "title": "Monthly College Report", "msg": "The monthly performance and placement report is ready for review.", "cat": "System", "priority": "Medium", "time": "2 days ago", "date": "Earlier", "isRead": true, "isPinned": false, "roles": [UserRole.principal]},
-    
-    // Common
+
     {"id": "N11", "title": "Canteen Special Menu", "msg": "Today's special: Veg Biryani and Ice Cream! Available from 12 PM.", "cat": "Canteen", "priority": "Low", "time": "08:00 AM", "date": "Today", "isRead": false, "isPinned": false, "roles": [UserRole.student, UserRole.teacher, UserRole.hod, UserRole.principal]},
     {"id": "N12", "title": "Fee Payment Reminder", "msg": "Semester 6 fee payment due is approaching. Pay before 20th Dec.", "cat": "Fees", "priority": "High", "time": "3 days ago", "date": "Earlier", "isRead": true, "isPinned": false, "roles": [UserRole.student]},
   ];
 
   List<Map<String, dynamic>> get _filteredNotifications {
     return _allNotifications.where((n) {
-      // Role Filter
       bool hasRoleAccess = (n['roles'] as List).contains(_userRole);
       if (!hasRoleAccess) return false;
 
-      // Category Filter
       if (_selectedCategoryIndex != 0 && n['cat'] != _categories[_selectedCategoryIndex]) {
         return false;
       }
 
-      // Search Filter
       if (_searchController.text.isNotEmpty) {
         return (n['title'] as String).toLowerCase().contains(_searchController.text.toLowerCase()) ||
                (n['msg'] as String).toLowerCase().contains(_searchController.text.toLowerCase());
@@ -157,25 +147,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 : ListView(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     children: [
-                      if (pinnedList.isNotEmpty) ...[
-                        _buildSectionHeader("Pinned"),
-                        ...pinnedList.map((n) => _buildNotificationCard(n)).toList(),
-                        const SizedBox(height: 16),
-                      ],
-                      if (todayList.isNotEmpty) ...[
-                        _buildSectionHeader("Today"),
-                        ...todayList.map((n) => _buildNotificationCard(n)).toList(),
-                        const SizedBox(height: 16),
-                      ],
-                      if (yesterdayList.isNotEmpty) ...[
-                        _buildSectionHeader("Yesterday"),
-                        ...yesterdayList.map((n) => _buildNotificationCard(n)).toList(),
-                        const SizedBox(height: 16),
-                      ],
-                      if (earlierList.isNotEmpty) ...[
-                        _buildSectionHeader("Earlier"),
-                        ...earlierList.map((n) => _buildNotificationCard(n)).toList(),
-                      ],
+                      ..._notificationSection("Pinned", pinnedList),
+                      ..._notificationSection("Today", todayList),
+                      ..._notificationSection("Yesterday", yesterdayList),
+                      ..._notificationSection("Earlier", earlierList, spacing: false),
                     ],
                   ),
           ),
@@ -183,10 +158,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
       ),
     );
   }
-
-  // ============================================================
-  //  WIDGETS
-  // ============================================================
 
   Widget _buildSearchBar() {
     return Padding(
@@ -259,6 +230,19 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
+  List<Widget> _notificationSection(
+    String title,
+    List<Map<String, dynamic>> items, {
+    bool spacing = true,
+  }) {
+    if (items.isEmpty) return [];
+    return [
+      _buildSectionHeader(title),
+      ...items.map(_buildNotificationCard),
+      if (spacing) const SizedBox(height: 16),
+    ];
+  }
+
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(top: 8, bottom: 12),
@@ -280,18 +264,20 @@ class _NotificationScreenState extends State<NotificationScreen> {
     String priority = n['priority'] as String;
     String cat = n['cat'] as String;
 
-    Color priorityColor = Colors.blue;
-    if (priority == 'High') priorityColor = Colors.orange;
-    if (priority == 'Critical') priorityColor = Colors.red;
-    if (priority == 'Low') priorityColor = Colors.grey;
+    final priorityColor = {
+      'High': Colors.orange,
+      'Critical': Colors.red,
+      'Low': Colors.grey,
+    }[priority] ?? Colors.blue;
 
-    IconData catIcon = Icons.notifications_outlined;
-    if (cat == 'Attendance') catIcon = Icons.fact_check_outlined;
-    if (cat == 'Library') catIcon = Icons.menu_book_outlined;
-    if (cat == 'Placement') catIcon = Icons.work_outline;
-    if (cat == 'Emergency') catIcon = Icons.warning_amber_rounded;
-    if (cat == 'Canteen') catIcon = Icons.restaurant_outlined;
-    if (cat == 'Fees') catIcon = Icons.account_balance_wallet_outlined;
+    final catIcon = {
+      'Attendance': Icons.fact_check_outlined,
+      'Library': Icons.menu_book_outlined,
+      'Placement': Icons.work_outline,
+      'Emergency': Icons.warning_amber_rounded,
+      'Canteen': Icons.restaurant_outlined,
+      'Fees': Icons.account_balance_wallet_outlined,
+    }[cat] ?? Icons.notifications_outlined;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -300,9 +286,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: isPinned ? _primary.withOpacity(0.3) : Colors.grey.shade100, width: isPinned ? 1.5 : 1),
         boxShadow: [
-          if (!isRead) 
+          if (!isRead)
             BoxShadow(color: _primary.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 4))
-          else 
+          else
             BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),

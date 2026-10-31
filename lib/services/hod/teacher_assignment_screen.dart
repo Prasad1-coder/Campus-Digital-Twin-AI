@@ -7,7 +7,6 @@ import '../../subject_assignment_model.dart';
 import '../../subject_model.dart';
 import '../../user_model.dart';
 import '../../user_role.dart';
-
 import '../academic_class_service.dart';
 import '../academic_year_service.dart';
 import '../auth_service.dart';
@@ -18,38 +17,23 @@ class TeacherAssignmentScreen extends StatefulWidget {
   const TeacherAssignmentScreen({super.key});
 
   @override
-  State<TeacherAssignmentScreen> createState() =>
-      _TeacherAssignmentScreenState();
+  State<TeacherAssignmentScreen> createState() => _TeacherAssignmentScreenState();
 }
 
-class _TeacherAssignmentScreenState
-    extends State<TeacherAssignmentScreen> {
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
-
-  final AuthService _authService = AuthService();
-
-  final AcademicClassService _classService =
-      AcademicClassService();
-
-  final AcademicYearService _academicYearService =
-      AcademicYearService();
-
-  final SubjectService _subjectService =
-      SubjectService();
-
-  final SubjectAssignmentService _assignmentService =
-      SubjectAssignmentService();
+class _TeacherAssignmentScreenState extends State<TeacherAssignmentScreen> {
+  final _auth = AuthService();
+  final _classService = AcademicClassService();
+  final _yearService = AcademicYearService();
+  final _subjectService = SubjectService();
+  final _assignmentService = SubjectAssignmentService();
 
   UserModel? _currentUser;
-
   List<UserModel> _teachers = [];
   List<SubjectModel> _subjects = [];
   List<AcademicClassModel> _classes = [];
-  List<AcademicYearModel> _academicYears = [];
+  List<AcademicYearModel> _years = [];
   List<SubjectAssignmentModel> _assignments = [];
-
-  bool _isLoading = true;
+  bool _loading = true;
 
   @override
   void initState() {
@@ -57,1196 +41,526 @@ class _TeacherAssignmentScreenState
     _loadData();
   }
 
-  // ============================================================
-  // LOAD DATA
-  // ============================================================
+  String _norm(String s) => s.trim().toLowerCase();
+
+  T? _byId<T>(Iterable<T> list, String? id, String Function(T) getId) =>
+      list.where((e) => getId(e) == id).firstOrNull;
 
   Future<void> _loadData() async {
     if (!mounted) return;
-
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _loading = true);
 
     try {
-      final currentUser = _authService.getCurrentUser();
+      final user = _auth.getCurrentUser();
+      if (user == null) throw Exception('Logged-in user information not found.');
 
-      if (currentUser == null) {
-        throw Exception(
-          'Logged-in user information not found.',
-        );
-      }
-
-      _currentUser = currentUser;
-
-      final department =
-          currentUser.department.trim();
-
-      // --------------------------------------------------------
-      // LOAD TEACHERS + HODs
-      // --------------------------------------------------------
-
-      final usersSnapshot = await _firestore
+      final dept = _norm(user.department);
+      final users = await FirebaseFirestore.instance
           .collection('users')
-          .where(
-            'role',
-            whereIn: ['teacher', 'hod'],
-          )
-          .where(
-            'isActive',
-            isEqualTo: true,
-          )
+          .where('role', whereIn: ['teacher', 'hod'])
+          .where('isActive', isEqualTo: true)
           .get();
 
-      final teachers = usersSnapshot.docs
-          .map(
-            (doc) => _userFromFirestore(
-              doc.id,
-              doc.data(),
-            ),
-          )
-          .where(
-            (user) =>
-                user.department
-                    .trim()
-                    .toLowerCase() ==
-                department.toLowerCase(),
-          )
+      final teachers = users.docs
+          .map((d) => _userFromFirestore(d.id, d.data()))
+          .where((u) => _norm(u.department) == dept)
           .toList();
-
-      // --------------------------------------------------------
-      // LOAD SUBJECTS
-      // --------------------------------------------------------
-
-      final allSubjects =
-          await _subjectService.getActiveSubjects();
-
-      final subjects = allSubjects
-          .where(
-            (subject) =>
-                subject.department
-                    .trim()
-                    .toLowerCase() ==
-                department.toLowerCase(),
-          )
+      final subjects = (await _subjectService.getActiveSubjects())
+          .where((s) => _norm(s.department) == dept)
           .toList();
-
-      // --------------------------------------------------------
-      // LOAD ACADEMIC CLASSES
-      // --------------------------------------------------------
-
-      final classes =
-          await _classService.getClassesByDepartment(
-        department,
-      );
-
-      final activeClasses = classes
-          .where((item) => item.isActive)
+      final classes = (await _classService.getClassesByDepartment(user.department))
+          .where((c) => c.isActive)
           .toList();
-
-      // --------------------------------------------------------
-      // LOAD ACADEMIC YEARS
-      // --------------------------------------------------------
-
-      final academicYears =
-          await _academicYearService
-              .getActiveAcademicYears();
-
-      // --------------------------------------------------------
-      // LOAD EXISTING ASSIGNMENTS
-      // --------------------------------------------------------
-
-      final assignments =
-          await _assignmentService
-              .getDepartmentAssignments(
-        department,
-      );
+      final years = await _yearService.getActiveAcademicYears();
+      final assignments = await _assignmentService.getDepartmentAssignments(user.department);
 
       if (!mounted) return;
-
       setState(() {
+        _currentUser = user;
         _teachers = teachers;
         _subjects = subjects;
-        _classes = activeClasses;
-        _academicYears = academicYears;
+        _classes = classes;
+        _years = years;
         _assignments = assignments;
-        _isLoading = false;
+        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-
-      _showSnackBar(
-        'Failed to load data: $e',
-        isError: true,
-      );
+      setState(() => _loading = false);
+      _snack('Failed to load data: $e', error: true);
     }
   }
 
-  // ============================================================
-  // FIRESTORE USER → USER MODEL
-  // ============================================================
-
-  UserModel _userFromFirestore(
-    String id,
-    Map<String, dynamic> data,
-  ) {
-    DateTime parseDate(dynamic value) {
-      if (value is Timestamp) {
-        return value.toDate();
-      }
-
-      if (value is DateTime) {
-        return value;
-      }
-
-      if (value is String) {
-        return DateTime.tryParse(value) ??
-            DateTime.now();
-      }
-
+  UserModel _userFromFirestore(String id, Map<String, dynamic> data) {
+    DateTime parseDate(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is DateTime) return v;
+      if (v is String) return DateTime.tryParse(v) ?? DateTime.now();
       return DateTime.now();
     }
 
+    String str(String key, [String def = '']) => data[key]?.toString() ?? def;
+    DateTime? optDate(String key) => data[key] == null ? null : parseDate(data[key]);
+
     return UserModel(
       id: id,
-      collegeId:
-          data['collegeId']?.toString() ?? '',
-      fullName:
-          data['fullName']?.toString() ??
-              'Unknown User',
-      email:
-          data['email']?.toString() ?? '',
+      collegeId: str('collegeId'),
+      fullName: str('fullName', 'Unknown User'),
+      email: str('email'),
       password: '',
-      role: _parseUserRole(
-        data['role']?.toString(),
-      ),
-      department:
-          data['department']?.toString() ??
-              '',
-      designation:
-          data['designation']?.toString() ??
-              'Teacher',
-      semester:
-          (data['semester'] as num?)?.toInt(),
-      division:
-          data['division']?.toString(),
-      rollNumber:
-          data['rollNumber']?.toString(),
-      phoneNumber:
-          data['phoneNumber']?.toString() ??
-              '',
-      gender:
-          data['gender']?.toString() ??
-              '',
-      dateOfBirth:
-          data['dateOfBirth'] != null
-              ? parseDate(
-                  data['dateOfBirth'],
-                )
-              : null,
-      profileImageUrl:
-          data['profileImageUrl']?.toString(),
-      address:
-          data['address']?.toString() ??
-              '',
-      isActive:
-          data['isActive'] as bool? ??
-              true,
-      lastLogin:
-          data['lastLogin'] != null
-              ? parseDate(
-                  data['lastLogin'],
-                )
-              : null,
-      createdAt:
-          parseDate(data['createdAt']),
-      updatedAt:
-          parseDate(data['updatedAt']),
+      role: _parseRole(data['role']?.toString()),
+      department: str('department'),
+      designation: str('designation', 'Teacher'),
+      semester: (data['semester'] as num?)?.toInt(),
+      division: data['division']?.toString(),
+      rollNumber: data['rollNumber']?.toString(),
+      phoneNumber: str('phoneNumber'),
+      gender: str('gender'),
+      dateOfBirth: optDate('dateOfBirth'),
+      profileImageUrl: data['profileImageUrl']?.toString(),
+      address: str('address'),
+      isActive: data['isActive'] as bool? ?? true,
+      lastLogin: optDate('lastLogin'),
+      createdAt: parseDate(data['createdAt']),
+      updatedAt: parseDate(data['updatedAt']),
     );
   }
 
-  // ============================================================
-  // USER ROLE PARSER
-  // ============================================================
-
-  UserRole _parseUserRole(String? value) {
+  UserRole _parseRole(String? value) {
     switch (value?.trim().toLowerCase()) {
       case 'student':
         return UserRole.student;
-
-      case 'teacher':
-      case 'faculty':
-        return UserRole.teacher;
-
       case 'hod':
         return UserRole.hod;
-
       case 'principal':
         return UserRole.principal;
-
-      default:
+      default: // teacher / faculty / unknown
         return UserRole.teacher;
     }
   }
 
-  // ============================================================
-  // OPEN ASSIGNMENT DIALOG
-  // ============================================================
+  Widget _dropdown<T>({
+    required String label,
+    required IconData icon,
+    required T? value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?>? onChanged,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: DropdownButtonFormField<T>(
+          initialValue: value,
+          isExpanded: true,
+          decoration: InputDecoration(
+            labelText: label,
+            prefixIcon: Icon(icon),
+            border: const OutlineInputBorder(),
+          ),
+          items: items,
+          onChanged: onChanged,
+        ),
+      );
 
-  Future<void> _openAssignmentDialog({
-    SubjectAssignmentModel? existingAssignment,
-  }) async {
+  DropdownMenuItem<T> _item<T>(T value, String text) =>
+      DropdownMenuItem(value: value, child: Text(text, overflow: TextOverflow.ellipsis));
+
+  Future<void> _openAssignmentDialog({SubjectAssignmentModel? existing}) async {
     if (_currentUser == null) return;
 
-    String? selectedTeacherId = existingAssignment?.teacherId;
-    String? selectedAcademicYearId = existingAssignment?.academicYearId;
-    String? selectedClassId = existingAssignment?.classId;
-    String? selectedDivision = existingAssignment?.division;
-    int? selectedSemester = existingAssignment?.semester;
-    String? selectedSubjectId = existingAssignment?.subjectId;
-    String selectedAssignmentType =
-        existingAssignment?.assignmentType.isNotEmpty == true
-            ? existingAssignment!.assignmentType
-            : 'regular';
+    String? teacherId = existing?.teacherId;
+    String? yearId = existing?.academicYearId;
+    String? classId = existing?.classId;
+    String? division = existing?.division;
+    int? semester = existing?.semester;
+    String? subjectId = existing?.subjectId;
+    String type = existing?.assignmentType.isNotEmpty == true
+        ? existing!.assignmentType
+        : 'regular';
 
-    if (selectedAcademicYearId == null && _academicYears.isNotEmpty) {
-      final current = _academicYears.where((y) => y.isCurrent);
-      selectedAcademicYearId =
-          current.isNotEmpty ? current.first.id : _academicYears.first.id;
+    if (yearId == null && _years.isNotEmpty) {
+      yearId = (_years.where((y) => y.isCurrent).firstOrNull ?? _years.first).id;
     }
 
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            AcademicClassModel? selectedClass;
-            if (selectedClassId != null) {
-              for (final item in _classes) {
-                if (item.id == selectedClassId) {
-                  selectedClass = item;
-                  break;
-                }
-              }
-            }
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final selectedClass = _byId(_classes, classId, (c) => c.id);
+          final divisions = selectedClass?.divisions ?? <String>[];
+          final semesters = selectedClass?.semesters ?? <int>[];
 
-            final divisions = selectedClass?.divisions ?? <String>[];
-            final semesters = selectedClass?.semesters ?? <int>[];
+          if (!divisions.contains(division)) division = null;
+          if (!semesters.contains(semester)) {
+            semester = null;
+            subjectId = null;
+          }
 
-            if (selectedDivision != null &&
-                !divisions.contains(selectedDivision)) {
-              selectedDivision = null;
-            }
-            if (selectedSemester != null &&
-                !semesters.contains(selectedSemester)) {
-              selectedSemester = null;
-              selectedSubjectId = null;
-            }
+          final availableSubjects =
+              _subjects.where((s) => semester == null || s.semester == semester).toList();
+          if (!availableSubjects.any((s) => s.id == subjectId)) subjectId = null;
 
-            final availableSubjects = _subjects.where((subject) {
-              final sameDepartment = subject.department.trim().toLowerCase() ==
-                  _currentUser!.department.trim().toLowerCase();
-              final sameSemester = selectedSemester == null ||
-                  subject.semester == selectedSemester;
-              return sameDepartment && sameSemester;
-            }).toList();
-
-            if (selectedSubjectId != null &&
-                !availableSubjects.any((s) => s.id == selectedSubjectId)) {
-              selectedSubjectId = null;
-            }
-
-            return AlertDialog(
-              title: Row(
-                children: [
-                  Icon(existingAssignment == null
-                      ? Icons.assignment_ind_outlined
-                      : Icons.edit_outlined),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(existingAssignment == null
-                        ? 'Assign Subject'
-                        : 'Edit Assignment'),
-                  ),
-                ],
-              ),
-              content: SizedBox(
-                width: 520,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedTeacherId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Teacher / HOD',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _teachers.map((teacher) {
-                          return DropdownMenuItem<String>(
-                            value: teacher.id,
-                            child: Text(
-                              '${teacher.fullName} (${teacher.designation})',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setDialogState(() => selectedTeacherId = value);
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedAcademicYearId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Academic Year',
-                          prefixIcon: Icon(Icons.calendar_today_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _academicYears.map((year) {
-                          return DropdownMenuItem<String>(
-                            value: year.id,
-                            child: Text(
-                              year.isCurrent ? '${year.name} (Current)' : year.name,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _academicYears.isEmpty
-                            ? null
-                            : (value) {
-                                setDialogState(() {
-                                  selectedAcademicYearId = value;
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedClassId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Class / Program',
-                          prefixIcon: Icon(Icons.school_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _classes.map((academicClass) {
-                          return DropdownMenuItem<String>(
-                            value: academicClass.id,
-                            child: Text(
-                              '${academicClass.program} • ${academicClass.yearName}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _classes.isEmpty
-                            ? null
-                            : (value) {
-                                setDialogState(() {
-                                  selectedClassId = value;
-                                  selectedDivision = null;
-                                  selectedSemester = null;
-                                  selectedSubjectId = null;
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedDivision,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Division',
-                          prefixIcon: Icon(Icons.groups_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: divisions.map((division) {
-                          return DropdownMenuItem<String>(
-                            value: division,
-                            child: Text('Division $division'),
-                          );
-                        }).toList(),
-                        onChanged: selectedClass == null
-                            ? null
-                            : (value) {
-                                setDialogState(() => selectedDivision = value);
-                              },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<int>(
-                        initialValue: selectedSemester,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Semester',
-                          prefixIcon: Icon(Icons.format_list_numbered),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: semesters.map((semester) {
-                          return DropdownMenuItem<int>(
-                            value: semester,
-                            child: Text('Semester $semester'),
-                          );
-                        }).toList(),
-                        onChanged: selectedClass == null
-                            ? null
-                            : (value) {
-                                setDialogState(() {
-                                  selectedSemester = value;
-                                  selectedSubjectId = null;
-                                });
-                              },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedSubjectId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Subject',
-                          prefixIcon: Icon(Icons.menu_book_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: availableSubjects.map((subject) {
-                          return DropdownMenuItem<String>(
-                            value: subject.id,
-                            child: Text(
-                              '${subject.code} • ${subject.name}',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: selectedSemester == null
-                            ? null
-                            : (value) {
-                                setDialogState(() => selectedSubjectId = value);
-                              },
-                      ),
-                      const SizedBox(height: 16),
-
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedAssignmentType,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Assignment Type',
-                          prefixIcon: Icon(Icons.category_outlined),
-                          border: OutlineInputBorder(),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'regular', child: Text('Regular')),
-                          DropdownMenuItem(value: 'lab', child: Text('Lab')),
-                          DropdownMenuItem(value: 'elective', child: Text('Elective')),
-                          DropdownMenuItem(value: 'substitute', child: Text('Substitute')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setDialogState(() => selectedAssignmentType = value);
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+          return AlertDialog(
+            title: Text(existing == null ? 'Assign Subject' : 'Edit Assignment'),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _dropdown<String>(
+                      label: 'Teacher / HOD',
+                      icon: Icons.person_outline,
+                      value: teacherId,
+                      items: _teachers
+                          .map((t) => _item(t.id, '${t.fullName} (${t.designation})'))
+                          .toList(),
+                      onChanged: (v) => setDialogState(() => teacherId = v),
+                    ),
+                    _dropdown<String>(
+                      label: 'Academic Year',
+                      icon: Icons.calendar_today_outlined,
+                      value: yearId,
+                      items: _years
+                          .map((y) => _item(y.id, y.isCurrent ? '${y.name} (Current)' : y.name))
+                          .toList(),
+                      onChanged: _years.isEmpty ? null : (v) => setDialogState(() => yearId = v),
+                    ),
+                    _dropdown<String>(
+                      label: 'Class / Program',
+                      icon: Icons.school_outlined,
+                      value: classId,
+                      items: _classes
+                          .map((c) => _item(c.id, '${c.program} • ${c.yearName}'))
+                          .toList(),
+                      onChanged: _classes.isEmpty
+                          ? null
+                          : (v) => setDialogState(() {
+                                classId = v;
+                                division = null;
+                                semester = null;
+                                subjectId = null;
+                              }),
+                    ),
+                    _dropdown<String>(
+                      label: 'Division',
+                      icon: Icons.groups_outlined,
+                      value: division,
+                      items: divisions.map((d) => _item(d, 'Division $d')).toList(),
+                      onChanged:
+                          selectedClass == null ? null : (v) => setDialogState(() => division = v),
+                    ),
+                    _dropdown<int>(
+                      label: 'Semester',
+                      icon: Icons.format_list_numbered,
+                      value: semester,
+                      items: semesters.map((s) => _item(s, 'Semester $s')).toList(),
+                      onChanged: selectedClass == null
+                          ? null
+                          : (v) => setDialogState(() {
+                                semester = v;
+                                subjectId = null;
+                              }),
+                    ),
+                    _dropdown<String>(
+                      label: 'Subject',
+                      icon: Icons.menu_book_outlined,
+                      value: subjectId,
+                      items: availableSubjects
+                          .map((s) => _item(s.id, '${s.code} • ${s.name}'))
+                          .toList(),
+                      onChanged:
+                          semester == null ? null : (v) => setDialogState(() => subjectId = v),
+                    ),
+                    _dropdown<String>(
+                      label: 'Assignment Type',
+                      icon: Icons.category_outlined,
+                      value: type,
+                      items: const [
+                        DropdownMenuItem(value: 'regular', child: Text('Regular')),
+                        DropdownMenuItem(value: 'lab', child: Text('Lab')),
+                        DropdownMenuItem(value: 'elective', child: Text('Elective')),
+                        DropdownMenuItem(value: 'substitute', child: Text('Substitute')),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setDialogState(() => type = v);
+                      },
+                    ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('Cancel'),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
+              FilledButton.icon(
+                onPressed: () => _saveAssignment(
+                  dialogContext,
+                  existing: existing,
+                  teacherId: teacherId,
+                  yearId: yearId,
+                  classId: classId,
+                  division: division,
+                  semester: semester,
+                  subjectId: subjectId,
+                  type: type,
                 ),
-                FilledButton.icon(
-                  icon: const Icon(Icons.save_outlined),
-                  label: Text(existingAssignment == null ? 'Assign' : 'Update'),
-                  onPressed: () async {
-                    if (selectedTeacherId == null ||
-                        selectedAcademicYearId == null ||
-                        selectedClassId == null ||
-                        selectedDivision == null ||
-                        selectedSemester == null ||
-                        selectedSubjectId == null) {
-                      _showSnackBar(
-                        'Please select Teacher, Academic Year, Class, Division, Semester and Subject.',
-                        isError: true,
-                      );
-                      return;
-                    }
-
-                    UserModel? teacher;
-                    AcademicYearModel? academicYear;
-                    AcademicClassModel? academicClass;
-                    SubjectModel? subject;
-
-                    for (final item in _teachers) {
-                      if (item.id == selectedTeacherId) {
-                        teacher = item;
-                        break;
-                      }
-                    }
-                    for (final item in _academicYears) {
-                      if (item.id == selectedAcademicYearId) {
-                        academicYear = item;
-                        break;
-                      }
-                    }
-                    for (final item in _classes) {
-                      if (item.id == selectedClassId) {
-                        academicClass = item;
-                        break;
-                      }
-                    }
-                    for (final item in _subjects) {
-                      if (item.id == selectedSubjectId) {
-                        subject = item;
-                        break;
-                      }
-                    }
-
-                    if (teacher == null ||
-                        academicYear == null ||
-                        academicClass == null ||
-                        subject == null) {
-                      _showSnackBar(
-                        'Selected data is no longer available. Refresh and try again.',
-                        isError: true,
-                      );
-                      return;
-                    }
-
-                    final duplicate = _assignments.any((assignment) =>
-                        assignment.id != existingAssignment?.id &&
-                        assignment.isActive &&
-                        assignment.teacherId == teacher!.id &&
-                        assignment.subjectId == subject!.id &&
-                        assignment.classId == academicClass!.id &&
-                        assignment.division == selectedDivision &&
-                        assignment.semester == selectedSemester &&
-                        assignment.academicYearId == academicYear!.id);
-
-                    if (duplicate) {
-                      _showSnackBar(
-                        'This subject is already assigned to this teacher for the selected class, division, semester and academic year.',
-                        isError: true,
-                      );
-                      return;
-                    }
-
-                    try {
-                      final now = DateTime.now();
-
-                      final assignment = SubjectAssignmentModel(
-                        id: existingAssignment?.id ?? '',
-                        teacherId: teacher.id,
-                        teacherName: teacher.fullName,
-                        subjectId: subject.id,
-                        subjectName: subject.name,
-                        subjectCode: subject.code,
-                        department: _currentUser!.department,
-                        classId: academicClass.id,
-                        className: academicClass.yearName,
-                        program: academicClass.program,
-                        division: selectedDivision!,
-                        semester: selectedSemester!,
-                        academicYearId: academicYear.id,
-                        academicYear: academicYear.name,
-                        assignmentType: selectedAssignmentType,
-                        startDate: existingAssignment?.startDate ?? now,
-                        endDate: existingAssignment?.endDate,
-                        assignedBy: _currentUser!.id,
-                        assignedByName: _currentUser!.fullName,
-                        isActive: true,
-                        createdAt: existingAssignment?.createdAt ?? now,
-                        updatedAt: now,
-                      );
-
-                      if (existingAssignment == null) {
-                        await _assignmentService.createAssignment(assignment);
-                      } else {
-                        await _assignmentService.updateAssignment(assignment);
-                      }
-
-                      if (!mounted) return;
-                      Navigator.pop(dialogContext);
-                      await _loadData();
-
-                      _showSnackBar(
-                        existingAssignment == null
-                            ? 'Subject assigned successfully.'
-                            : 'Assignment updated successfully.',
-                      );
-                    } catch (e) {
-                      _showSnackBar(
-                        'Failed to save assignment:\n$e',
-                        isError: true,
-                      );
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+                icon: const Icon(Icons.save_outlined),
+                label: Text(existing == null ? 'Assign' : 'Update'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  // ============================================================
-  // TOGGLE ASSIGNMENT
-  // ============================================================
-
-  Future<void> _toggleAssignment(
-    SubjectAssignmentModel assignment,
-  ) async {
-    try {
-      await _assignmentService
-          .setAssignmentStatus(
-        assignment.id,
-        !assignment.isActive,
-      );
-
-      await _loadData();
-
-      _showSnackBar(
-        assignment.isActive
-            ? 'Assignment deactivated.'
-            : 'Assignment activated.',
-      );
-    } catch (e) {
-      _showSnackBar(
-        'Failed to update assignment: $e',
-        isError: true,
-      );
+  Future<void> _saveAssignment(
+    BuildContext dialogContext, {
+    required SubjectAssignmentModel? existing,
+    required String? teacherId,
+    required String? yearId,
+    required String? classId,
+    required String? division,
+    required int? semester,
+    required String? subjectId,
+    required String type,
+  }) async {
+    if (teacherId == null || yearId == null || classId == null ||
+        division == null || semester == null || subjectId == null) {
+      _snack('Select Teacher, Academic Year, Class, Division, Semester and Subject.',
+          error: true);
+      return;
     }
-  }
 
-  // ============================================================
-  // DELETE
-  // ============================================================
+    final teacher = _byId(_teachers, teacherId, (e) => e.id);
+    final year = _byId(_years, yearId, (e) => e.id);
+    final cls = _byId(_classes, classId, (e) => e.id);
+    final subject = _byId(_subjects, subjectId, (e) => e.id);
+    final user = _currentUser;
 
-  Future<void> _deleteAssignment(
-    SubjectAssignmentModel assignment,
-  ) async {
-    final confirmed =
-        await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title:
-              const Text('Delete Assignment'),
-          content: Text(
-            'Delete ${assignment.subjectName} assignment for ${assignment.teacherName}?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () =>
-                  Navigator.pop(
-                context,
-                false,
-              ),
-              child:
-                  const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(
-                context,
-                true,
-              ),
-              child:
-                  const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
+    if (teacher == null || year == null || cls == null || subject == null || user == null) {
+      _snack('Selected data is unavailable. Refresh and try again.', error: true);
+      return;
+    }
 
-    if (confirmed != true) {
+    final duplicate = _assignments.any((a) =>
+        a.id != existing?.id &&
+        a.isActive &&
+        a.teacherId == teacher.id &&
+        a.subjectId == subject.id &&
+        a.classId == cls.id &&
+        a.division == division &&
+        a.semester == semester &&
+        a.academicYearId == year.id);
+
+    if (duplicate) {
+      _snack('This subject is already assigned to this teacher for this class, division, semester and academic year.',
+          error: true);
       return;
     }
 
     try {
-      await _assignmentService
-          .deleteAssignment(
-        assignment.id,
+      final now = DateTime.now();
+      final assignment = SubjectAssignmentModel(
+        id: existing?.id ?? '',
+        teacherId: teacher.id,
+        teacherName: teacher.fullName,
+        subjectId: subject.id,
+        subjectName: subject.name,
+        subjectCode: subject.code,
+        department: user.department,
+        classId: cls.id,
+        className: cls.yearName,
+        program: cls.program,
+        division: division,
+        semester: semester,
+        academicYearId: year.id,
+        academicYear: year.name,
+        assignmentType: type,
+        startDate: existing?.startDate ?? now,
+        endDate: existing?.endDate,
+        assignedBy: user.id,
+        assignedByName: user.fullName,
+        isActive: true,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
       );
 
+      existing == null
+          ? await _assignmentService.createAssignment(assignment)
+          : await _assignmentService.updateAssignment(assignment);
+
+      if (!mounted) return;
+      Navigator.pop(dialogContext);
       await _loadData();
-
-      _showSnackBar(
-        'Assignment deleted.',
-      );
+      _snack(existing == null
+          ? 'Subject assigned successfully.'
+          : 'Assignment updated successfully.');
     } catch (e) {
-      _showSnackBar(
-        'Failed to delete assignment: $e',
-        isError: true,
-      );
+      _snack('Failed to save assignment: $e', error: true);
     }
   }
 
-  // ============================================================
-  // ERROR DIALOG
-  // ============================================================
-
-  void _showDialogError(
-    BuildContext context,
-    String message,
-  ) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(this.context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.red.shade700,
-      ),
-    );
+  /// Runs [action], reloads data and shows [success]; shows [failure] on error.
+  Future<void> _run(Future<void> Function() action, String success, String failure) async {
+    try {
+      await action();
+      await _loadData();
+      _snack(success);
+    } catch (e) {
+      _snack('$failure: $e', error: true);
+    }
   }
 
-  // ============================================================
-  // SNACKBAR
-  // ============================================================
+  Future<void> _toggleAssignment(SubjectAssignmentModel a) => _run(
+        () => _assignmentService.setAssignmentStatus(a.id, !a.isActive),
+        a.isActive ? 'Assignment deactivated.' : 'Assignment activated.',
+        'Failed to update assignment',
+      );
 
-  void _showSnackBar(
-    String message, {
-    bool isError = false,
-  }) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior:
-            SnackBarBehavior.floating,
-        backgroundColor:
-            isError
-                ? Colors.red.shade700
-                : null,
-      ),
-    );
-  }
-
-  // ============================================================
-  // UI
-  // ============================================================
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Teacher Assignment',
-        ),
+  Future<void> _deleteAssignment(SubjectAssignmentModel a) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Assignment'),
+        content: Text('Delete ${a.subjectName} assignment for ${a.teacherName}?'),
         actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _isLoading
-                ? null
-                : _loadData,
-            icon: const Icon(
-              Icons.refresh,
-            ),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
         ],
       ),
-      floatingActionButton:
-          FloatingActionButton.extended(
-        onPressed:
-            _isLoading
-                ? null
-                : () =>
-                    _openAssignmentDialog(),
-        icon: const Icon(
-          Icons.add,
-        ),
-        label:
-            const Text(
-          'Assign Subject',
-        ),
-      ),
-      body: _isLoading
-          ? const Center(
-              child:
-                  CircularProgressIndicator(),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child:
-                  _buildAssignmentList(),
-            ),
     );
+    if (confirmed != true) return;
+    await _run(() => _assignmentService.deleteAssignment(a.id), 'Assignment deleted.',
+        'Failed to delete assignment');
   }
 
-  // ============================================================
-  // ASSIGNMENT LIST
-  // ============================================================
+  void _snack(String message, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: error ? Colors.red.shade700 : null,
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Teacher Assignment'),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: _loading ? null : _loadData,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _loading ? null : () => _openAssignmentDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Assign Subject'),
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(onRefresh: _loadData, child: _buildAssignmentList()),
+      );
 
   Widget _buildAssignmentList() {
     if (_assignments.isEmpty) {
       return ListView(
-        physics:
-            const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          SizedBox(
-            height:
-                MediaQuery.of(context)
-                        .size
-                        .height *
-                    0.25,
-          ),
-          const Icon(
-            Icons.assignment_outlined,
-            size: 64,
-          ),
-          const SizedBox(
-            height: 16,
-          ),
+          SizedBox(height: MediaQuery.of(context).size.height * .25),
+          const Icon(Icons.assignment_outlined, size: 64),
+          const SizedBox(height: 16),
           const Center(
-            child: Text(
-              'No subject assignments found.',
-              style:
-                  TextStyle(
-                fontSize: 18,
-                fontWeight:
-                    FontWeight.w600,
-              ),
-            ),
+            child: Text('No subject assignments found.',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           ),
-          const SizedBox(
-            height: 8,
-          ),
-          const Center(
-            child: Text(
-              'Tap "Assign Subject" to create one.',
-            ),
-          ),
+          const SizedBox(height: 8),
+          const Center(child: Text('Tap "Assign Subject" to create one.')),
         ],
       );
     }
 
     return ListView.builder(
-      padding:
-          const EdgeInsets.all(16),
-      itemCount:
-          _assignments.length,
-      itemBuilder:
-          (context, index) {
-        final assignment =
-            _assignments[index];
-
-        return _buildAssignmentCard(
-          assignment,
-        );
-      },
+      padding: const EdgeInsets.all(16),
+      itemCount: _assignments.length,
+      itemBuilder: (context, i) => _assignmentCard(_assignments[i]),
     );
   }
 
-  // ============================================================
-  // ASSIGNMENT CARD
-  // ============================================================
+  Widget _assignmentCard(SubjectAssignmentModel item) {
+    final statusColor = item.isActive ? Colors.green : Colors.red;
 
-  Widget _buildAssignmentCard(
-    SubjectAssignmentModel assignment,
-  ) {
     return Card(
-      margin:
-          const EdgeInsets.only(
-        bottom: 12,
-      ),
+      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding:
-            const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --------------------------------------------------
-            // HEADER
-            // --------------------------------------------------
-
             Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  child: Icon(
-                    Icons
-                        .menu_book_outlined,
-                  ),
-                ),
-                const SizedBox(
-                  width: 12,
-                ),
+                const CircleAvatar(child: Icon(Icons.menu_book_outlined)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        assignment
-                            .subjectName,
-                        style:
-                            const TextStyle(
-                          fontSize: 17,
-                          fontWeight:
-                              FontWeight
-                                  .bold,
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 4,
-                      ),
-                      Text(
-                        assignment
-                            .subjectCode,
-                        style:
-                            TextStyle(
-                          color: Colors
-                              .grey
-                              .shade600,
-                        ),
-                      ),
+                      Text(item.subjectName,
+                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      Text(item.subjectCode, style: TextStyle(color: Colors.grey.shade600)),
                     ],
                   ),
                 ),
                 PopupMenuButton<String>(
-                  onSelected:
-                      (value) {
-                    if (value ==
-                        'edit') {
-                      _openAssignmentDialog(
-                        existingAssignment:
-                            assignment,
-                      );
-                    } else if (value ==
-                        'toggle') {
-                      _toggleAssignment(
-                        assignment,
-                      );
-                    } else if (value ==
-                        'delete') {
-                      _deleteAssignment(
-                        assignment,
-                      );
-                    }
+                  onSelected: (v) {
+                    if (v == 'edit') _openAssignmentDialog(existing: item);
+                    if (v == 'toggle') _toggleAssignment(item);
+                    if (v == 'delete') _deleteAssignment(item);
                   },
-                  itemBuilder:
-                      (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .edit_outlined,
-                          ),
-                          SizedBox(
-                            width: 8,
-                          ),
-                          Text('Edit'),
-                        ],
-                      ),
-                    ),
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
                     PopupMenuItem(
-                      value:
-                          'toggle',
-                      child: Row(
-                        children: [
-                          Icon(
-                            assignment
-                                    .isActive
-                                ? Icons
-                                    .pause_circle_outline
-                                : Icons
-                                    .play_circle_outline,
-                          ),
-                          const SizedBox(
-                            width: 8,
-                          ),
-                          Text(
-                            assignment
-                                    .isActive
-                                ? 'Deactivate'
-                                : 'Activate',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value:
-                          'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .delete_outline,
-                          ),
-                          SizedBox(
-                            width: 8,
-                          ),
-                          Text('Delete'),
-                        ],
-                      ),
-                    ),
+                        value: 'toggle', child: Text(item.isActive ? 'Deactivate' : 'Activate')),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
                   ],
                 ),
               ],
             ),
-
-            const Divider(
-              height: 24,
-            ),
-
-            // --------------------------------------------------
-            // TEACHER
-            // --------------------------------------------------
-
-            _infoRow(
-              Icons.person_outline,
-              'Teacher',
-              assignment.teacherName,
-            ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
-            // --------------------------------------------------
-            // PROGRAM / CLASS
-            // --------------------------------------------------
-
-            _infoRow(
-              Icons.school_outlined,
-              'Class',
-              assignment.program.isNotEmpty
-                  ? '${assignment.program} • ${assignment.className}'
-                  : assignment.className,
-            ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
-            // --------------------------------------------------
-            // DIVISION / SEMESTER
-            // --------------------------------------------------
-
-            _infoRow(
-              Icons.groups_outlined,
-              'Section',
-              'Division ${assignment.division} • Semester ${assignment.semester}',
-            ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
-            // --------------------------------------------------
-            // ACADEMIC YEAR
-            // --------------------------------------------------
-
-            _infoRow(
-              Icons.calendar_today_outlined,
-              'Academic Year',
-              assignment.academicYear,
-            ),
-
-            const SizedBox(
-              height: 8,
-            ),
-
-            // --------------------------------------------------
-            // TYPE
-            // --------------------------------------------------
-
-            _infoRow(
-              Icons.category_outlined,
-              'Type',
-              _formatAssignmentType(
-                assignment.assignmentType,
-              ),
-            ),
-
-            const SizedBox(
-              height: 12,
-            ),
-
-            // --------------------------------------------------
-            // STATUS
-            // --------------------------------------------------
-
+            const Divider(height: 24),
+            _infoRow(Icons.person_outline, 'Teacher', item.teacherName),
+            _infoRow(Icons.school_outlined, 'Class',
+                item.program.isNotEmpty ? '${item.program} • ${item.className}' : item.className),
+            _infoRow(Icons.groups_outlined, 'Section',
+                'Division ${item.division} • Semester ${item.semester}'),
+            _infoRow(Icons.calendar_today_outlined, 'Academic Year', item.academicYear),
+            _infoRow(Icons.category_outlined, 'Type', _formatType(item.assignmentType)),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration:
-                      BoxDecoration(
-                    color:
-                        assignment.isActive
-                            ? Colors
-                                .green
-                                .withValues(
-                                alpha: 0.12,
-                              )
-                            : Colors
-                                .red
-                                .withValues(
-                                alpha: 0.12,
-                              ),
-                    borderRadius:
-                        BorderRadius
-                            .circular(
-                      20,
-                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: .12),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    assignment.isActive
-                        ? 'ACTIVE'
-                        : 'INACTIVE',
-                    style:
-                        TextStyle(
-                      fontSize: 11,
-                      fontWeight:
-                          FontWeight
-                              .bold,
-                      color:
-                          assignment
-                                  .isActive
-                              ? Colors
-                                  .green
-                              : Colors
-                                  .red,
-                    ),
+                    item.isActive ? 'ACTIVE' : 'INACTIVE',
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
                   ),
                 ),
                 const Spacer(),
                 Flexible(
-                  child: Text(
-                    'Assigned by ${assignment.assignedByName}',
-                    overflow:
-                        TextOverflow
-                            .ellipsis,
-                    style:
-                        TextStyle(
-                      fontSize: 12,
-                      color: Colors
-                          .grey
-                          .shade600,
-                    ),
-                  ),
+                  child: Text('Assigned by ${item.assignedByName}',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                 ),
               ],
             ),
@@ -1256,81 +570,26 @@ class _TeacherAssignmentScreenState
     );
   }
 
-  // ============================================================
-  // INFO ROW
-  // ============================================================
-
-  Widget _infoRow(
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 19,
-          color:
-              Colors.grey.shade600,
-        ),
-        const SizedBox(
-          width: 10,
-        ),
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style:
-                TextStyle(
-              color:
-                  Colors.grey.shade600,
-              fontSize: 13,
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 19, color: Colors.grey.shade600),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 100,
+              child: Text(label, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
             ),
-          ),
+            Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
+          ],
         ),
-        Expanded(
-          child: Text(
-            value,
-            style:
-                const TextStyle(
-              fontWeight:
-                  FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+      );
 
-  // ============================================================
-  // FORMAT TYPE
-  // ============================================================
-
-  String _formatAssignmentType(
-    String type,
-  ) {
-    if (type.isEmpty) {
-      return 'Regular';
-    }
-
-    return type[0].toUpperCase() +
-        type.substring(1);
-  }
+  String _formatType(String type) =>
+      type.isEmpty ? 'Regular' : '${type[0].toUpperCase()}${type.substring(1)}';
 }
 
-// ================================================================
-// HELPER EXTENSION
-// ================================================================
-
-extension FirstOrNullExtension<T>
-    on Iterable<T> {
-  T? get firstOrNull {
-    if (isEmpty) {
-      return null;
-    }
-
-    return first;
-  }
+extension _FirstOrNull<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

@@ -34,7 +34,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543210',
       gender: 'Male',
       dateOfBirth: DateTime(1975, 5, 12),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null, 
       address: 'Campus Quarters, Block A',
       isActive: true,
       createdAt: DateTime(2020, 1, 1),
@@ -54,7 +54,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543211',
       gender: 'Male',
       dateOfBirth: DateTime(1980, 3, 22),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null, 
       address: 'Campus Quarters, Block B',
       isActive: true,
       createdAt: DateTime(2020, 2, 1),
@@ -72,7 +72,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543212',
       gender: 'Female',
       dateOfBirth: DateTime(1982, 7, 18),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null,
       address: 'Campus Quarters, Block B',
       isActive: true,
       createdAt: DateTime(2020, 2, 5),
@@ -90,7 +90,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543213',
       gender: 'Male',
       dateOfBirth: DateTime(1978, 11, 2),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null, 
       address: 'Campus Quarters, Block B',
       isActive: true,
       createdAt: DateTime(2020, 2, 10),
@@ -110,7 +110,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543214',
       gender: 'Male',
       dateOfBirth: DateTime(1985, 2, 14),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null, 
       address: 'City Center, Flat 302',
       isActive: true,
       createdAt: DateTime(2021, 1, 15),
@@ -128,7 +128,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543215',
       gender: 'Female',
       dateOfBirth: DateTime(1986, 6, 25),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null,
       address: 'City Center, Flat 405',
       isActive: true,
       createdAt: DateTime(2021, 2, 20),
@@ -146,7 +146,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543216',
       gender: 'Male',
       dateOfBirth: DateTime(1988, 9, 10),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null,
       address: 'City Center, Flat 101',
       isActive: true,
       createdAt: DateTime(2021, 3, 5),
@@ -169,7 +169,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543217',
       gender: 'Male',
       dateOfBirth: DateTime(2002, 1, 15),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null,
       address: 'Hostel Block C, Room 12',
       isActive: true,
       createdAt: DateTime(2022, 8, 1),
@@ -190,7 +190,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543218',
       gender: 'Female',
       dateOfBirth: DateTime(2003, 4, 22),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null, 
       address: 'Hostel Block D, Room 8',
       isActive: true,
       createdAt: DateTime(2022, 8, 2),
@@ -211,7 +211,7 @@ class DummyUserRepository {
       phoneNumber: '+919876543219',
       gender: 'Male',
       dateOfBirth: DateTime(2004, 8, 18),
-      profileImageUrl: null, // 👈 FIX: Set to null
+      profileImageUrl: null,
       address: 'Hostel Block C, Room 15',
       isActive: true,
       createdAt: DateTime(2022, 8, 3),
@@ -219,7 +219,6 @@ class DummyUserRepository {
     ),
   ];
 
-  /// Internal map linking user IDs to their specific permission models.
   final Map<String, PermissionModel> _userPermissions = {
     'uuid-principal-01': PermissionModel.principal(id: 'perm-principal-01', ownerId: 'uuid-principal-01'),
     'uuid-hod-cs-01': PermissionModel.hod(id: 'perm-hod-cs-01', ownerId: 'uuid-hod-cs-01'),
