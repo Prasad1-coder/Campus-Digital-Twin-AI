@@ -36,19 +36,26 @@ const Color _softBlue = Color(0xFFE3F2FD);
 const Color _textDark = Color(0xFF1A237E);
 
 bool _isDark(ThemeData t) => t.brightness == Brightness.dark;
-Color _tintOf(ThemeData t) => _isDark(t) ? _primary.withValues(alpha: 0.20) : _softBlue;
+Color _tintOf(ThemeData t) =>
+    _isDark(t) ? _primary.withValues(alpha: 0.20) : _softBlue;
 Color _iconOf(ThemeData t) => _isDark(t) ? _accent : _primary;
 
 /// Rounded themed card with a soft border (used by stats, nav bar, empty sections).
-BoxDecoration _box(ThemeData t, {double radius = 20, List<BoxShadow>? shadow}) => BoxDecoration(
+BoxDecoration _box(ThemeData t,
+        {double radius = 20, List<BoxShadow>? shadow}) =>
+    BoxDecoration(
       color: t.cardColor,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: t.dividerColor.withValues(alpha: 0.6)),
       boxShadow: shadow,
     );
 
-List<BoxShadow> _shadow(Color c, double alpha, double blur, double dy) =>
-    [BoxShadow(color: c.withValues(alpha: alpha), blurRadius: blur, offset: Offset(0, dy))];
+List<BoxShadow> _shadow(Color c, double alpha, double blur, double dy) => [
+      BoxShadow(
+          color: c.withValues(alpha: alpha),
+          blurRadius: blur,
+          offset: Offset(0, dy))
+    ];
 
 // ------------------------------------------------------------
 // DASHBOARD
@@ -153,10 +160,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _openAI() => _push(const AIScreen());
   void _openNotice() => _push(NoticeScreen(userRole: widget.userRole));
-  void _openEvents() =>
-      _push(EventsScreen(userRole: widget.userRole, currentUserName: _userName));
-  void _openAttendance() =>
-      _push(AttendanceScreen(userRole: widget.userRole, currentUserName: _userName));
+  void _openEvents() => _push(
+      EventsScreen(userRole: widget.userRole, currentUserName: _userName));
+  void _openAttendance() => _push(
+      AttendanceScreen(userRole: widget.userRole, currentUserName: _userName));
   void _openAnalytics() => _push(AnalyticsDashboardScreen());
 
   // ----------------------------------------------------------
@@ -181,8 +188,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Icons.calendar_month_outlined,
         () => _push(TimetableScreen(userRole: widget.userRole))
       ),
-      ('library', 'Library', Icons.menu_book_outlined, () => _push(const LibraryScreen())),
-      ('canteen', 'Canteen', Icons.restaurant_outlined, () => _push(const CanteenScreen())),
+      (
+        'library',
+        'Library',
+        Icons.menu_book_outlined,
+        () => _push(const LibraryScreen())
+      ),
+      (
+        'canteen',
+        'Canteen',
+        Icons.restaurant_outlined,
+        () => _push(const CanteenScreen())
+      ),
       (
         'placement',
         'Placement',
@@ -191,8 +208,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       ('notice', 'Notices', Icons.campaign_outlined, _openNotice),
       ('events', 'Events', Icons.celebration_outlined, _openEvents),
-      ('digitalid', 'Digital ID', Icons.badge_outlined, () => _push(const DigitalIdScreen())),
-      ('campusmap', 'Campus Map', Icons.map_outlined, () => _push(const MapScreen())),
+      (
+        'digitalid',
+        'Digital ID',
+        Icons.badge_outlined,
+        () => _push(const DigitalIdScreen())
+      ),
+      (
+        'campusmap',
+        'Campus Map',
+        Icons.map_outlined,
+        () => _push(const MapScreen())
+      ),
       ('analytics', 'Analytics', Icons.insights_outlined, _openAnalytics),
       ('studentmanagement', 'Students', Icons.groups_outlined, _openAttendance),
       ('reports', 'Reports', Icons.summarize_outlined, _openAnalytics),
@@ -221,8 +248,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Icons.admin_panel_settings_outlined,
           () => _push(const AdminPanelScreen())
         ),
-      ('Profile', Icons.person_outline, () => _push(ProfileScreen(role: widget.userRole))),
-      ('Settings', Icons.settings_outlined, () => _push(const SettingsScreen())),
+      (
+        'Profile',
+        Icons.person_outline,
+        () => _push(ProfileScreen(role: widget.userRole))
+      ),
+      (
+        'Settings',
+        Icons.settings_outlined,
+        () => _push(const SettingsScreen())
+      ),
     ];
   }
 
@@ -238,11 +273,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (
             'Attendance',
             Icons.fact_check_outlined,
-            () => AttendanceScreen(userRole: widget.userRole, currentUserName: _userName)
+            () => AttendanceScreen(
+                userRole: widget.userRole, currentUserName: _userName)
           )
         else if (_hasAccess('analytics'))
-          ('Analytics', Icons.insights_outlined, () => AnalyticsDashboardScreen()),
-        ('Profile', Icons.person_outline, () => ProfileScreen(role: widget.userRole)),
+          (
+            'Analytics',
+            Icons.insights_outlined,
+            () => AnalyticsDashboardScreen()
+          ),
+        (
+          'Profile',
+          Icons.person_outline,
+          () => ProfileScreen(role: widget.userRole)
+        ),
       ];
 
   void _onNavTap(int index) {
@@ -254,9 +298,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // MAIN BUILD
   // ----------------------------------------------------------
 
-  Widget _appBarAction(String tooltip, IconData icon, VoidCallback onTap) => IconButton(
+  Widget _appBarAction(String tooltip, IconData icon, VoidCallback onTap) =>
+      IconButton(
         tooltip: tooltip,
-        style: IconButton.styleFrom(backgroundColor: Colors.white.withValues(alpha: 0.14)),
+        style: IconButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.14)),
         icon: Icon(icon, color: Colors.white),
         onPressed: onTap,
       );
@@ -300,22 +346,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text(_greeting,
                       style: const TextStyle(
-                          fontSize: 12, color: Colors.white70, fontWeight: FontWeight.w500)),
+                          fontSize: 12,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w500)),
                   const SizedBox(height: 2),
                   Text(_userName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 19, color: Colors.white, fontWeight: FontWeight.w700)),
+                          fontSize: 19,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700)),
                 ],
               )
             : Text(tabs[safeIndex].$1,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 19, color: Colors.white, fontWeight: FontWeight.w700)),
+                    fontSize: 19,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700)),
         actions: [
-          _appBarAction('Search', Icons.search_rounded, () => _push(GlobalSearchScreen())),
+          _appBarAction('Search', Icons.search_rounded,
+              () => _push(GlobalSearchScreen())),
           const SizedBox(width: 6),
           _appBarAction('Notifications', Icons.notifications_none_rounded,
               () => _push(NotificationScreen())),
@@ -327,8 +380,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         currentNavigatorIndex: _selectedIndex,
         onItemTapped: _onNavTap,
       ),
-      bottomNavigationBar:
-          MediaQuery.of(context).viewInsets.bottom > 0 ? null : _buildFloatingNav(tabs, safeIndex),
+      bottomNavigationBar: MediaQuery.of(context).viewInsets.bottom > 0
+          ? null
+          : _buildFloatingNav(tabs, safeIndex),
       body: IndexedStack(
         index: safeIndex,
         children: [for (final t in tabs) t.$3()],
@@ -340,7 +394,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // FLOATING NAVIGATION BAR
   // ----------------------------------------------------------
 
-  Widget _buildFloatingNav(List<(String, IconData, Widget Function())> tabs, int current) {
+  Widget _buildFloatingNav(
+      List<(String, IconData, Widget Function())> tabs, int current) {
     final theme = _theme;
 
     return SafeArea(
@@ -350,7 +405,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         height: 64,
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
         padding: const EdgeInsets.all(6),
-        decoration: _box(theme, radius: 28, shadow: _shadow(_primary, 0.18, 24, 10)),
+        decoration:
+            _box(theme, radius: 28, shadow: _shadow(_primary, 0.18, 24, 10)),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -374,7 +430,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(tabs[i].$2,
-                              size: 22, color: i == current ? Colors.white : theme.hintColor),
+                              size: 22,
+                              color: i == current
+                                  ? Colors.white
+                                  : theme.hintColor),
                           if (i == current) ...[
                             const SizedBox(width: 6),
                             Flexible(
@@ -415,7 +474,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   _buildHeaderCard(),
-                  Positioned(left: 18, right: 18, bottom: -38, child: _buildQuickStats()),
+                  Positioned(
+                      left: 18,
+                      right: 18,
+                      bottom: -38,
+                      child: _buildQuickStats()),
                 ],
               ),
               const SizedBox(height: 62),
@@ -448,12 +511,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+          borderRadius:
+              const BorderRadius.vertical(bottom: Radius.circular(30)),
           boxShadow: _shadow(_primary, 0.25, 20, 10),
         ),
         child: Stack(
           children: [
-            const Positioned.fill(child: CustomPaint(painter: _BlueprintPainter())),
+            const Positioned.fill(
+                child: CustomPaint(painter: _BlueprintPainter())),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 64),
               child: Column(
@@ -468,11 +533,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35)),
                         ),
                         child: Text(_initial,
                             style: const TextStyle(
-                                color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800)),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -490,17 +558,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Text(_designation,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                style: const TextStyle(
+                                    color: Colors.white70, fontSize: 13)),
                           ],
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28)),
                         ),
                         child: Text(_roleString,
                             style: const TextStyle(
@@ -511,7 +582,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _headerDetail(Icons.apartment_outlined, 'Campus information unavailable'),
+                  _headerDetail(Icons.apartment_outlined,
+                      'Campus information unavailable'),
                   const SizedBox(height: 8),
                   _headerDetail(Icons.school_outlined, _department),
                 ],
@@ -530,7 +602,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w500)),
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w500)),
           ),
         ],
       );
@@ -557,11 +631,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Container(
       height: 84,
-      decoration: _box(theme, radius: 22, shadow: _shadow(Colors.black, 0.08, 18, 8)),
+      decoration:
+          _box(theme, radius: 22, shadow: _shadow(Colors.black, 0.08, 18, 8)),
       child: Row(
         children: [
           for (var i = 0; i < stats.length; i++) ...[
-            if (i > 0) Container(width: 1, height: 40, color: theme.dividerColor),
+            if (i > 0)
+              Container(width: 1, height: 40, color: theme.dividerColor),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -583,7 +659,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 11.5, color: theme.hintColor, fontWeight: FontWeight.w500)),
+                          fontSize: 11.5,
+                          color: theme.hintColor,
+                          fontWeight: FontWeight.w500)),
                 ],
               ),
             ),
@@ -615,7 +693,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const Spacer(),
             Text('${modules.length} modules',
                 style: TextStyle(
-                    fontSize: 12, color: theme.hintColor, fontWeight: FontWeight.w500)),
+                    fontSize: 12,
+                    color: theme.hintColor,
+                    fontWeight: FontWeight.w500)),
           ],
         ),
         const SizedBox(height: 14),
@@ -679,7 +759,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('AI Suggestions', Icons.smart_toy_outlined, _openAI),
+            _buildSectionHeader(
+                'AI Suggestions', Icons.smart_toy_outlined, _openAI),
             const SizedBox(height: 10),
             _buildAiTipCard(),
           ],
@@ -722,7 +803,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       color: Colors.amber.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.auto_awesome, color: Colors.amber, size: 22),
+                    child: const Icon(Icons.auto_awesome,
+                        color: Colors.amber, size: 22),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -747,12 +829,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         else
                           Text(_aiSuggestion,
                               style: const TextStyle(
-                                  color: Colors.white, fontSize: 13.5, height: 1.4)),
+                                  color: Colors.white,
+                                  fontSize: 13.5,
+                                  height: 1.4)),
                       ],
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white60),
+                  const Icon(Icons.chevron_right_rounded,
+                      color: Colors.white60),
                 ],
               ),
             ),
@@ -772,7 +857,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Icon(icon, color: _iconOf(theme), size: 24),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(message, style: TextStyle(color: theme.hintColor, fontSize: 13)),
+            child: Text(message,
+                style: TextStyle(color: theme.hintColor, fontSize: 13)),
           ),
         ],
       ),
@@ -809,9 +895,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 Text('See all',
                     style: TextStyle(
-                        color: _iconOf(theme), fontWeight: FontWeight.w700, fontSize: 12)),
+                        color: _iconOf(theme),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12)),
                 const SizedBox(width: 2),
-                Icon(Icons.chevron_right_rounded, size: 16, color: _iconOf(theme)),
+                Icon(Icons.chevron_right_rounded,
+                    size: 16, color: _iconOf(theme)),
               ],
             ),
           ),
@@ -874,7 +963,8 @@ class _DashboardCard extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const _DashboardCard({required this.title, required this.icon, required this.onTap});
+  const _DashboardCard(
+      {required this.title, required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

@@ -1,486 +1,364 @@
-# 🎓 Smart Campus Digital Application
+# Campus Digital Twin AI
 
-**A Smart and Digital Solution for Campus Management**
+A smart campus management application built with Flutter. The aim of this project is to bring different college-related activities and information into one place, making it easier for students, teachers, HODs and administrators to access the features they need.
 
-Smart Campus Digital Application is a mobile application project designed to simplify campus management and provide students and college staff with convenient access to campus-related information and services.
+The application includes separate screens for academic activities, attendance, timetable, library, canteen, notices, events and other campus-related modules. It also includes Firebase-based authentication, role-based access and an AI assistant integration.
 
-The application uses Flutter and Dart for mobile app development and Firebase services where configured. It is designed around role-based access, academic information, campus utilities, QR-based attendance, and AI-powered assistance.
+## About the Project
 
-The goal is to make campus activities more organized, accessible, and efficient through a single digital platform.
+Managing different college activities through separate systems can be difficult. Students may need to check their attendance in one place, find timetable information somewhere else and contact different departments for academic updates.
 
-## 📌 Table of Contents
+Campus Digital Twin AI is an attempt to make these activities accessible through a single application.
 
-* About the Project
-* Objectives
-* Key Features
-* User Roles
-* Role-Based Authentication
-* AI Assistant
-* QR-Based Attendance
-* Campus Modules
-* Technologies Used
-* Project Architecture
-* Installation and Setup
-* Security
-* Future Improvements
-* Developer
+The application is designed around different user roles. Based on the logged-in user's role, the application provides access to relevant sections and functionalities.
 
-## 📖 About the Project
+The project is being developed using Flutter and Firebase, with a focus on a simple interface and a modular structure.
 
-In many educational institutions, students and teachers access academic information and campus services through different platforms or manual processes.
+## Main Features
 
-The Smart Campus Digital Application aims to bring relevant campus information and services together in one place.
+### 1. Role-Based Login
 
-It explores how mobile application development, cloud-based services, role-based permissions, and AI assistance can improve the campus experience.
+The application supports different user roles:
 
-## 🎯 Objectives
+* Student
+* Teacher
+* HOD
+* Principal
 
-* Develop a user-friendly mobile application.
-* Organize campus information and services in one platform.
-* Provide different access levels for students and college staff.
-* Explore secure authentication and authorization.
-* Simplify attendance-related workflows through QR codes.
-* Provide AI-assisted interactions.
-* Make the application expandable for future campus requirements.
+Authentication is handled using Firebase Authentication. After login, the application retrieves the user's profile and role from Cloud Firestore.
 
-## ✨ Key Features
+Access permissions are determined according to the user's role.
 
-### 1. User Authentication
+### 2. Student Dashboard
 
-Provides a foundation for user sign-in and account access through the configured authentication system.
+The student section includes screens and modules for accessing academic and campus-related information.
 
-### 2. Role-Based Dashboards
+Available modules include:
 
-Supports a role-oriented design in which users can access features according to their assigned permissions.
+* Dashboard
+* Attendance
+* Timetable
+* Examination
+* Fees
+* Library
+* Canteen
+* Hostel
+* Events
+* Notices
+* Notifications
+* Digital ID
+* Profile and Settings
 
-### 3. AI Assistant
+### 3. Teacher Section
 
-Provides a chat-based interface for AI-assisted interactions. Depending on the implementation, it may include suggested prompts, voice input, response animations, and response controls.
+The project includes teacher-related screens for academic and classroom activities.
 
-### 4. QR-Based Attendance
+* My Teaching
+* Class Environment
 
-Provides a foundation for recording attendance through QR-based workflows involving authorized teachers and students.
+### 4. HOD Section
 
-### 5. Digital Campus Map
+The HOD section includes screens for academic management.
 
-Helps users access campus location information and explore relevant campus facilities.
+* Subject Management
+* Teacher Assignment
 
-### 6. Timetable
+### 5. Administration
 
-Organizes academic schedule information for convenient access.
+The project includes an Admin Panel screen for administrative activities.
 
-### 7. Digital Student ID
+### 6. AI Assistant
 
-Provides a digital interface for displaying student identification information and, where implemented, a verification QR code.
+The application includes an AI Assistant screen connected to Google's Gemini API.
 
-### 8. Smart Canteen
+The assistant is intended to help with campus-related questions, academics, timetable information, attendance, library-related queries and general questions.
 
-Provides an interface for accessing canteen-related information, such as food categories, search, and menu items.
+The Gemini integration currently uses the `gemini-2.5-flash` model through an HTTP API request.
 
-### 9. Library Module
+**Note:** A valid Gemini API key must be configured before AI responses can work. The API key should not be exposed in a publicly distributed application.
 
-Provides a place for library-related information and services.
+### 7. Campus Map
 
-### 10. Notices and Events
+The project includes a Map screen and uses the Google Maps Flutter package for map-related functionality.
 
-Organizes campus announcements and event information.
+### 8. Search and Analytics
 
-### 11. Profile and Settings
+The application also includes:
 
-Provides access to user profile information and available application settings.
+* Global Search
+* Analytics Dashboard
+* Placement Dashboard
 
-*Note: The availability of individual features depends on their implementation in the current project.*
+These screens provide a foundation for accessing and presenting different types of campus information.
 
-## 👥 User Roles
+### 9. Theme Support
 
-The application is designed around four possible user roles.
+The application supports light and dark themes.
 
-| Role      | Purpose                                                           |
-| --------- | ----------------------------------------------------------------- |
-| Student   | Access student-related information and permitted campus services. |
-| Teacher   | Access authorized teaching and attendance functionality.          |
-| HOD       | Access authorized departmental information and functions.         |
-| Principal | Access authorized institutional and administrative information.   |
+Theme handling is managed through a separate `ThemeController`.
 
-### Student
+### 10. Multiple Language Support
 
-* Access permitted campus information.
-* View available academic information.
-* Use the AI Assistant.
-* Access student-specific services.
-* Participate in authorized attendance workflows.
+The application declares support for:
 
-### Teacher
+* English
+* Hindi
+* Marathi
 
-* Access assigned academic information.
-* Manage authorized attendance sessions.
-* View relevant class information.
-* Use available campus services.
+## Technologies Used
 
-### Head of Department (HOD)
+The project is built using the following technologies and packages.
 
-* Access authorized departmental information.
-* Oversee relevant academic activities.
-* Manage permitted departmental resources.
+| Technology              | Purpose                           |
+| ----------------------- | --------------------------------- |
+| Flutter                 | Application development           |
+| Dart                    | Programming language              |
+| Firebase Authentication | User authentication               |
+| Cloud Firestore         | User profile and application data |
+| Firebase Core           | Firebase initialization           |
+| Firebase Storage        | Storage integration dependency    |
+| Google Gemini API       | AI assistant integration          |
+| Google Maps Flutter     | Map-related functionality         |
+| Google Fonts            | Application typography            |
+| Shared Preferences      | Local preference storage          |
+| FL Chart                | Charts and analytics              |
+| Mobile Scanner          | QR and barcode scanning           |
+| QR Flutter              | QR code generation                |
+| Speech To Text          | Speech recognition integration    |
+| Google Sign-In          | Sign-in integration dependency    |
+| Geolocator              | Location-related functionality    |
+| Image Picker            | Image selection                   |
+| Share Plus              | Sharing integration               |
+| HTTP                    | API communication                 |
 
-### Principal
+The packages listed above are project dependencies. Their presence in `pubspec.yaml` does not necessarily mean every package is already connected to a completed application feature.
 
-* Access authorized institutional information.
-* Use permitted administrative functions.
-* Review available institutional reports.
+## Project Structure
 
-These responsibilities describe the intended access model. Actual permissions must match the application's implementation.
-
-## 🔐 Role-Based Authentication and Authorization
-
-Role-Based Access Control (RBAC) helps determine which features and resources a user can access.
-
-### How It Works
-
-1. The user signs in.
-2. The authentication system verifies the user's identity.
-3. The application retrieves the user's assigned role from a trusted source.
-4. The application checks the user's permissions.
-5. The user accesses the appropriate dashboard and authorized features.
-
-### Authentication Flow
+The project follows a modular structure, with screens, services, models and role-specific sections organized inside the `lib` directory.
 
 ```text
-User
-  |
-  v
-Login / Sign In
-  |
-  v
-Authentication
-  |
-  v
-Retrieve User Role
-  |
-  v
-Check Permissions
-  |
-  v
-Authorized Dashboard
-```
-
-### Security Rules
-
-* Users must not be able to assign themselves higher privileges.
-* Students must not access restricted administrative functions.
-* Teachers must access only authorized academic resources.
-* HOD access must respect departmental permissions.
-* Principal permissions must be explicitly defined.
-* Protected data must be secured at the backend level.
-
-If Firebase Authentication is used, it can manage user identity. Firebase Security Rules or a trusted backend should enforce access to protected data and operations.
-
-**Important:** Hiding a button or screen in Flutter is not enough to secure an operation.
-
-## 🤖 AI Assistant
-
-The AI Assistant provides a chat-based interface for AI-powered interactions.
-
-Depending on the implemented functionality, it can support:
-
-* Text-based conversations.
-* Suggested prompts.
-* Voice input.
-* Response animations.
-* Stopping an ongoing response.
-
-The assistant can be extended to help users access campus information. Any AI service integration and its capabilities should be documented according to the actual implementation.
-
-## 📷 QR-Based Attendance System
-
-The QR-based attendance module aims to simplify attendance recording.
-
-### General Workflow
-
-1. An authorized teacher creates an attendance session.
-2. The application generates or displays the session's QR code.
-3. A student scans the QR code.
-4. The application validates the session and the user's permissions.
-5. An attendance record is saved if the required checks succeed.
-
-### Important Considerations
-
-* Verify teacher permissions.
-* Validate attendance sessions.
-* Prevent duplicate attendance submissions.
-* Restrict unauthorized record creation.
-* Use appropriate backend validation.
-
-A QR scan alone does not guarantee that the correct student is physically present.
-
-## 🏫 Campus Modules
-
-### Campus Map
-
-Provides access to campus location information and facilities.
-
-### Academic Management
-
-Organizes relevant information about departments, subjects, classes, and academic activities where implemented.
-
-### Digital Student ID
-
-Displays permitted student identification information.
-
-### Smart Canteen
-
-Provides access to canteen-related information and menu interfaces.
-
-### Library
-
-Organizes library-related information and, where implemented, book records.
-
-### Timetable
-
-Provides access to available academic schedules.
-
-### Notices and Events
-
-Displays campus announcements and event information.
-
-### Analytics and Reports
-
-Can provide attendance summaries and academic reports if the required data processing and reporting functionality is implemented.
-
-## 🛠️ Technologies Used
-
-| Technology               | Purpose                               |
-| ------------------------ | ------------------------------------- |
-| Flutter                  | Mobile application development        |
-| Dart                     | Application programming language      |
-| Firebase Authentication  | User authentication, if configured    |
-| Cloud Firestore          | Cloud database, if configured         |
-| Firebase Storage         | File and image storage, if configured |
-| Git                      | Version control                       |
-| GitHub                   | Source code hosting                   |
-| VS Code / Android Studio | Development environment               |
-
-Only list the Firebase services actually used in the application.
-
-## 🏗️ Project Architecture
-
-The application can be organized into three main layers.
-
-**1. Presentation Layer**
-
-* User interface.
-* Dashboards.
-* Forms and navigation.
-* Module screens.
-
-**2. Application Logic Layer**
-
-* Authentication state.
-* Role and permission handling.
-* Input validation.
-* Application workflows.
-
-**3. Backend Layer**
-
-* User profiles.
-* Academic information.
-* Attendance records.
-* Campus data.
-* Other configured services.
-
-### Architecture Overview
-
-```text
-       Flutter Application
-                |
-                v
-       Application Logic
-                |
-                v
-      Authentication & RBAC
-                |
-                v
-       Backend / Firebase
-                |
-                v
-        Protected Data
-```
-
-This is a conceptual architecture. The actual implementation may differ.
-
-## 📂 Project Structure
-
-A typical Flutter project may use a structure similar to this:
-
-```text
-smart-campus/
+campus_digital_twin_ai/
+│
 ├── android/
 ├── ios/
+├── linux/
+├── macos/
+├── web/
+├── windows/
+│
 ├── lib/
+│   │
+│   ├── academic_class_model.dart
+│   ├── academic_year_model.dart
+│   ├── admin_panel_screen.dart
+│   ├── ai_screen.dart
+│   ├── analytics_dashboard.dart
+│   ├── attendance_screen.dart
+│   ├── canteen_screen.dart
+│   ├── dashboard_screen.dart
+│   ├── digital_id_screen.dart
+│   ├── drawer_widget.dart
+│   ├── dummy_users.dart
+│   ├── edit_profile_screen.dart
+│   ├── events_screen.dart
+│   ├── examination_screen.dart
+│   ├── fees_screen.dart
+│   ├── global_search_screen.dart
+│   ├── hostel_screen.dart
+│   ├── library_screen.dart
+│   ├── login_screen.dart
 │   ├── main.dart
-│   ├── screens/
-│   ├── widgets/
-│   ├── models/
+│   ├── map_screen.dart
+│   ├── notice_screen.dart
+│   ├── notification_screen.dart
+│   ├── permission_model.dart
+│   ├── placement_dashboard_screen.dart
+│   ├── profile_screen.dart
+│   ├── settings_screen.dart
+│   ├── splash_screen.dart
+│   ├── subject_assignment_model.dart
+│   ├── subject_model.dart
+│   ├── teaching_context.dart
+│   ├── theme_controller.dart
+│   ├── timetable_model.dart
+│   ├── timetable_screen.dart
+│   ├── user_model.dart
+│   ├── user_role.dart
+│   │
 │   ├── services/
-│   └── utils/
+│   │   ├── academic_class_service.dart
+│   │   ├── academic_year_service.dart
+│   │   ├── ai_command_service.dart
+│   │   ├── auth_service.dart
+│   │   ├── gemini_service.dart
+│   │   ├── subject_assignment_service.dart
+│   │   └── subject_service.dart
+│   │
+│   ├── hod/
+│   │   ├── subject_management_screen.dart
+│   │   └── teacher_assignment_screen.dart
+│   │
+│   └── teacher/
+│       ├── class_environment_screen.dart
+│       └── my_teaching_screen.dart
+│
 ├── test/
+├── .gitignore
+├── analysis_options.yaml
 ├── pubspec.yaml
 ├── pubspec.lock
-├── .gitignore
 └── README.md
 ```
 
-**Folder descriptions:**
+## Application Flow
 
-* `lib/` — Main Dart source code.
-* `screens/` — Application screens.
-* `widgets/` — Reusable UI components.
-* `models/` — Data models.
-* `services/` — Backend and application services.
-* `utils/` — Helper functions and utilities.
-* `test/` — Automated tests.
-* `pubspec.yaml` — Dependencies and project configuration.
-* `README.md` — Project documentation.
+The application follows a simple login and navigation flow.
 
-This is an example structure. Keep the actual folder names from your repository.
+1. The application starts from `main.dart`.
+2. Firebase is initialized.
+3. The theme settings are initialized.
+4. The Splash Screen is displayed.
+5. The application checks whether a previous Firebase session can be restored.
+6. If a valid session exists, the user's profile and role are retrieved from Firestore.
+7. The user is directed to the appropriate dashboard.
+8. If no valid session exists, the Login Screen is displayed.
 
-## ⚙️ Installation and Setup
+## Authentication and Permissions
+
+Authentication is managed in:
+
+`lib/services/auth_service.dart`
+
+The authentication service handles:
+
+* Firebase email and password authentication.
+* College ID to email mapping.
+* Retrieving user information from Firestore.
+* Checking the user's account status.
+* Identifying the user's role.
+* Restoring an existing login session.
+* Logging out users.
+
+User information is retrieved from the Firestore `users` collection.
+
+The project also includes a permission model for controlling access to application modules and actions based on user roles.
+
+**Security consideration:** Client-side permission checks alone are not sufficient for production security. Appropriate Firebase Security Rules or backend authorization must also be configured.
+
+## AI Integration
+
+The AI-related implementation is mainly handled through:
+
+`lib/ai_screen.dart`
+
+`lib/services/gemini_service.dart`
+
+The Gemini service sends HTTP requests to Google's Gemini API and processes the generated response.
+
+Current model:
+
+`gemini-2.5-flash`
+
+Before using the AI assistant, configure a valid API key.
+
+For production use, API requests should be handled through a secure backend instead of keeping a private API key inside the Flutter application.
+
+## Getting Started
+
+Follow these steps to run the project locally.
 
 ### Prerequisites
 
-Install the following:
+Make sure you have installed:
 
 * Flutter SDK
 * Dart SDK
-* Git
 * Android Studio or Visual Studio Code
-* Android emulator or compatible physical device
-* Firebase configuration, if required
+* Git
+* A Firebase project
 
-### Step 1: Clone the Repository
+### 1. Clone the Repository
 
-```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
-```
-
-Replace the placeholder with your actual repository URL.
-
-### Step 2: Open the Project Directory
+Open your terminal and run:
 
 ```bash
-cd smart-campus
+git clone https://github.com/Prasad1-coder/Campus-Digital-Twin-AI.git
 ```
 
-Use the actual directory name created after cloning.
+### 2. Open the Project
 
-### Step 3: Install Dependencies
+```bash
+cd Campus-Digital-Twin-AI
+```
+
+### 3. Install Dependencies
 
 ```bash
 flutter pub get
 ```
 
-### Step 4: Check the Development Environment
+### 4. Configure Firebase
+
+Connect the application to your Firebase project.
+
+Make sure Firebase Authentication and Cloud Firestore are configured correctly for your target platform.
+
+The application expects user profile documents in the Firestore `users` collection.
+
+### 5. Configure Gemini API
+
+Add a valid Gemini API key to the Gemini service configuration.
+
+Do not upload your actual API key to GitHub. For production, use a secure backend to communicate with the Gemini API.
+
+### 6. Run the Application
+
+Connect an Android device or start an emulator.
+
+Then run:
 
 ```bash
-flutter doctor
-```
-
-Resolve any relevant environment issues.
-
-### Step 5: Configure Firebase
-
-If the application uses Firebase, configure the correct Firebase project and the services required by your implementation.
-
-### Step 6: Run the Application
-
-```bash
-flutter devices
 flutter run
 ```
 
-### Build an Android APK
+## Important Notes
 
-```bash
-flutter build apk --release
-```
+* Firebase must be configured for authentication and Firestore-dependent functionality.
+* The Firestore user profile must contain a valid role.
+* The Gemini API requires a valid API key.
+* Google Maps functionality may require platform-specific configuration.
+* Some packages may require additional Android, iOS or platform-level setup.
+* Client-side permissions should be supported by proper backend security rules before production deployment.
 
-The APK is typically generated at:
+## Future Improvements
 
-```text
-build/app/outputs/flutter-apk/app-release.apk
-```
+Some areas that can be improved as development continues:
 
-## 🔒 Security Considerations
+* Complete integration of all campus modules with Firestore.
+* Stronger backend authorization and security rules.
+* Improved AI assistant responses using actual campus data.
+* Better analytics and reporting.
+* More complete academic management workflows.
+* Improved testing and error handling.
+* Production-ready configuration for all supported platforms.
 
-Security is important when handling student information, authentication, and attendance records.
+## Project Status
 
-Recommended practices include:
+Campus Digital Twin AI is an ongoing development project.
 
-* Use secure authentication.
-* Enforce backend authorization.
-* Configure Firebase Security Rules appropriately.
-* Protect API secrets and private credentials.
-* Validate user input.
-* Restrict access to sensitive student information.
-* Prevent unauthorized role changes.
-* Validate QR attendance sessions.
-* Test unauthorized access scenarios.
+The project includes the main application structure, role-based authentication flow, multiple campus-related screens, Firebase integration and a Gemini API service.
 
-## 🚀 Future Improvements
+Some integrations and modules may require further configuration or development before production use.
 
-Potential improvements include:
-
-* Enhanced role-specific dashboards.
-* Improved attendance verification.
-* Live campus notifications.
-* Expanded timetable management.
-* Additional library functionality.
-* Live canteen information.
-* Better academic analytics.
-* Improved AI Assistant capabilities.
-* Automated testing.
-* Accessibility improvements.
-* Performance optimization.
-
-These are future possibilities and should not be presented as completed features.
-
-## 📚 Learning Outcomes
-
-This project provides practical experience with:
-
-* Flutter and Dart.
-* Mobile application development.
-* Authentication and authorization.
-* Role-Based Access Control.
-* Firebase integration.
-* Database concepts.
-* QR-based workflows.
-* Application architecture.
-* Git and GitHub.
-* Debugging and testing.
-* Technical documentation.
-
-## 📌 Project Information
-
-* **Project Name:** Smart Campus Digital Application
-* **Project Type:** Academic Project
-* **Frontend:** Flutter and Dart
-* **Backend:** Firebase services, where configured
-* **Access Model:** Role-based access control
-* **Development Status:** Update according to the actual project status.
-
-## 👨‍💻 Developer
+## Author
 
 **Prasad Deshmane**
 
 B.Sc. Computer Science Student
 
-Interested in software development, mobile applications, AI-powered systems, and learning new technologies through practical projects.
-
-**GitHub Repository:** Add your repository link here.
+GitHub: https://github.com/Prasad1-coder
 
 ---
 
-## 📄 License
-
-A license has not yet been specified in this README. Add an appropriate license file if you intend to distribute the project under an open-source license.
+*Built with Flutter and Firebase.*
